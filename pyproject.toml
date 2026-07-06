@@ -1,0 +1,64 @@
+[project]
+name = "stockrag"
+version = "0.1.0"
+description = "Stock Research Factor Engine + Ask-My-Docs RAG"
+readme = "README.md"
+authors = [
+    { name = "rajyyug1132", email = "rajyyug@gmail.com" }
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi~=0.115",
+    "uvicorn[standard]~=0.34",
+    "httpx~=0.28",
+    "tenacity~=9.0",
+    "pydantic~=2.10",
+    "pydantic-settings~=2.7",
+    "typer~=0.15",
+    "beautifulsoup4~=4.12",
+    "lxml~=5.3",
+    "tiktoken~=0.8",
+    "sentence-transformers~=3.3",
+    "chromadb~=0.6",
+    "rank-bm25~=0.2",
+    "yfinance~=0.2",
+    "pandas~=2.2",
+    "numpy~=2.1",
+    "pyyaml~=6.0",
+    "langchain~=0.3",
+    "langchain-community~=0.3",
+    "langchain-chroma~=0.2",
+    "langchain-huggingface~=0.1",
+    "langchain-ollama~=0.2",
+    "langchain-google-genai~=2.0",
+    "torch~=2.5",
+]
+
+[project.scripts]
+stockrag = "stockrag.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest~=8.3",
+    "ruff~=0.8",
+    "ragas~=0.2",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+# chroma-hnswlib's stable 0.7.6 release has no win_amd64/cp312 wheel (only
+# pre-releases do), which forces a from-source build requiring MSVC Build
+# Tools. 0.7.5 has a real Windows cp312 wheel and satisfies chromadb's
+# constraint, so pin it explicitly to stay on prebuilt wheels.
+[tool.uv]
+override-dependencies = ["chroma-hnswlib==0.7.5"]
+
+[build-system]
+requires = ["uv_build>=0.11.13,<0.12.0"]
+build-backend = "uv_build"
