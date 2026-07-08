@@ -62,6 +62,14 @@ def ingest_file(
 
 
 @app.command()
+def stats() -> None:
+    """SRE metrics over recorded requests: P50/P95 latency, citation coverage, cost."""
+    from stockrag.rag.metrics import summarize
+
+    typer.echo(json.dumps(summarize(), indent=2))
+
+
+@app.command()
 def retrieve(question: str, ticker: str, k: int = 6) -> None:
     """Debug: show what hybrid+rerank vs pure vector retrieval return."""
     from stockrag.rag.answer import get_retriever, get_vector_only_retriever

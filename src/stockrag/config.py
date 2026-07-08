@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     sec_user_agent: str = "StockRAG/0.1 rajyyug@gmail.com"
 
+    # Langfuse tracing (optional; tracing is a no-op when keys are absent).
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "https://cloud.langfuse.com"
+
     data_dir: Path = PROJECT_ROOT / "data"
     filings_dir: Path = PROJECT_ROOT / "data" / "filings"
     facts_dir: Path = PROJECT_ROOT / "data" / "facts"

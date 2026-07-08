@@ -27,6 +27,10 @@ THRESHOLDS = {
     "faithfulness": 0.75,
     "answer_relevancy": 0.70,
     "llm_context_precision_with_reference": 0.60,
+    # Locally computed (no LLM judge): groundedness proxy + hallucination
+    # resistance on the unanswerable questions.
+    "citation_coverage": 0.60,
+    "refusal_accuracy": 0.50,
 }
 # context_recall is reported but not gated: recall against a hand-written
 # reference is noisy for long filing answers.
@@ -42,6 +46,7 @@ def main() -> int:
     parser.add_argument("--subset", choices=["smoke", "golden"], default="smoke")
     parser.add_argument("--llm", default=None, help="Generation LLM provider: ollama (default) or gemini")
     parser.add_argument("--sleep", type=float, default=0.0, help="Seconds to sleep between questions (API rate limits)")
+    parser.add_argument("--limit", type=int, default=None, help="Only evaluate the first N questions (quota-constrained runs)")
     args = parser.parse_args()
 
     from stockrag.config import settings
@@ -63,15 +68,27 @@ def main() -> int:
     )
     from ragas.run_config import RunConfig
 
-    from stockrag.rag.answer import ask
+    from stockrag.rag.answer import NO_CONTEXT_MESSAGE, ask
     from stockrag.rag.embed import get_embeddings
+    from stockrag.rag.metrics import citation_coverage
 
     rows = load_dataset(args.subset)
+    if args.limit:
+        rows = rows[: args.limit]
     print(f"Running pipeline over {len(rows)} questions (subset={args.subset}, llm={args.llm or 'default'})...")
 
     samples: list[SingleTurnSample] = []
+    coverages: list[float] = []
+    refusal_expected = 0
+    refusal_correct = 0
     for i, row in enumerate(rows, start=1):
         result = ask(row["question"], row["ticker"], llm_provider=args.llm)
+        refused = result.answer == NO_CONTEXT_MESSAGE
+        if row.get("expected_section") == "unanswerable":
+            refusal_expected += 1
+            refusal_correct += int(refused)
+        elif not refused:
+            coverages.append(citation_coverage(result.answer))
         samples.append(
             SingleTurnSample(
                 user_input=row["question"],
@@ -103,6 +120,10 @@ def main() -> int:
     )
 
     scores = {metric: float(value) for metric, value in result._repr_dict.items()}
+    if coverages:
+        scores["citation_coverage"] = sum(coverages) / len(coverages)
+    if refusal_expected:
+        scores["refusal_accuracy"] = refusal_correct / refusal_expected
     print(json.dumps(scores, indent=2))
 
     results_dir = EVAL_DIR / "results"

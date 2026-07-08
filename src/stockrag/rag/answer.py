@@ -1,13 +1,16 @@
 import re
+import time
 from dataclasses import dataclass
 
 from langchain_core.documents import Document
-from langchain_core.output_parsers import StrOutputParser
 from langchain_core.retrievers import BaseRetriever
 
+from stockrag.config import settings
 from stockrag.rag.llm import get_llm
+from stockrag.rag.metrics import citation_coverage, estimate_cost_usd, record_request
 from stockrag.rag.prompts import load_prompt
 from stockrag.rag.store import get_vector_store
+from stockrag.rag.tracing import tracing_callbacks
 
 DEFAULT_K = 6
 CITATION_RE = re.compile(r"\[\d+\]")
@@ -79,27 +82,62 @@ def ask(
     retriever: BaseRetriever | None = None,
     llm_provider: str | None = None,
 ) -> AnswerResult:
-    retriever = retriever or get_retriever(ticker)
-    docs = retriever.invoke(question)
+    provider = llm_provider or settings.llm_provider
+    model = settings.gemini_model if provider == "gemini" else settings.ollama_model
+    config = {
+        "callbacks": tracing_callbacks(),
+        "run_name": "stockrag-ask",
+        "metadata": {"ticker": ticker.upper(), "prompt_version": prompt_version, "llm": provider},
+    }
+    metric: dict = {"ticker": ticker.upper(), "llm": provider, "model": model, "prompt_version": prompt_version}
 
-    if not docs:
-        return AnswerResult(
-            answer=NO_CONTEXT_MESSAGE, sources=[], prompt_version=prompt_version, contexts=[]
+    started = time.perf_counter()
+    try:
+        retriever = retriever or get_retriever(ticker)
+        docs = retriever.invoke(question, config=config)
+        metric["retrieval_ms"] = round((time.perf_counter() - started) * 1000)
+
+        if not docs:
+            metric.update(refused=True, total_ms=metric["retrieval_ms"])
+            record_request(metric)
+            return AnswerResult(
+                answer=NO_CONTEXT_MESSAGE, sources=[], prompt_version=prompt_version, contexts=[]
+            )
+
+        context, sources = _format_docs(docs)
+        chain = load_prompt(prompt_version) | get_llm(llm_provider)
+        llm_started = time.perf_counter()
+        message = chain.invoke({"question": question, "context": context}, config=config)
+        metric["llm_ms"] = round((time.perf_counter() - llm_started) * 1000)
+
+        answer = THINK_BLOCK_RE.sub("", str(message.content)).strip()
+
+        # Refuse answers that dodge citation enforcement rather than trusting
+        # uncited claims.
+        if not CITATION_RE.search(answer):
+            answer = NO_CONTEXT_MESSAGE
+
+        usage = getattr(message, "usage_metadata", None) or {}
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+        metric.update(
+            total_ms=round((time.perf_counter() - started) * 1000),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost_usd=estimate_cost_usd(model, input_tokens, output_tokens),
+            citation_coverage=citation_coverage(answer),
+            refused=answer == NO_CONTEXT_MESSAGE,
+            n_sources=len(sources),
         )
+        record_request(metric)
 
-    context, sources = _format_docs(docs)
-    chain = load_prompt(prompt_version) | get_llm(llm_provider) | StrOutputParser()
-    answer = chain.invoke({"question": question, "context": context})
-    answer = THINK_BLOCK_RE.sub("", answer).strip()
-
-    # Refuse answers that dodge citation enforcement rather than trusting
-    # uncited claims.
-    if not CITATION_RE.search(answer):
-        answer = NO_CONTEXT_MESSAGE
-
-    return AnswerResult(
-        answer=answer,
-        sources=sources,
-        prompt_version=prompt_version,
-        contexts=[doc.page_content for doc in docs],
-    )
+        return AnswerResult(
+            answer=answer,
+            sources=sources,
+            prompt_version=prompt_version,
+            contexts=[doc.page_content for doc in docs],
+        )
+    except Exception as exc:
+        metric.update(error=type(exc).__name__, total_ms=round((time.perf_counter() - started) * 1000))
+        record_request(metric)
+        raise
