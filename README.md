@@ -1,5 +1,9 @@
 # StockRAG — Factor Engine + Ask-My-Docs RAG for SEC Filings
 
+[![Eval CI](https://github.com/rajyyug1132/stockrag/actions/workflows/eval.yml/badge.svg)](https://github.com/rajyyug1132/stockrag/actions/workflows/eval.yml)
+![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 Production-grade stock research tooling that automates both halves of the
 "How to Research a Company" workflow:
 
