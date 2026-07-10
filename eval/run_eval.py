@@ -51,9 +51,10 @@ def main() -> int:
 
     from stockrag.config import settings
 
+    judge_provider = args.llm or settings.llm_provider
     judge_keys = {"gemini": settings.gemini_api_key, "nvidia": settings.nvidia_api_key}
-    if settings.llm_provider in judge_keys and not judge_keys[settings.llm_provider]:
-        print(f"ERROR: {settings.llm_provider.upper()}_API_KEY is required (Ragas judge). Set it in .env or the environment.")
+    if judge_provider in judge_keys and not judge_keys[judge_provider]:
+        print(f"ERROR: {judge_provider.upper()}_API_KEY is required (Ragas judge). Set it in .env or the environment.")
         return 2
 
     from ragas import EvaluationDataset, evaluate
@@ -103,10 +104,10 @@ def main() -> int:
 
     from stockrag.rag.llm import get_llm
 
-    judge = LangchainLLMWrapper(get_llm())
+    judge = LangchainLLMWrapper(get_llm(judge_provider))
     embeddings = LangchainEmbeddingsWrapper(get_embeddings())
 
-    print(f"Scoring with Ragas ({settings.llm_provider} judge, max_workers=1 for free-tier RPM)...")
+    print(f"Scoring with Ragas ({judge_provider} judge, max_workers=1 for free-tier RPM)...")
     result = evaluate(
         EvaluationDataset(samples=samples),
         metrics=[Faithfulness(), AnswerRelevancy(), LLMContextPrecisionWithReference(), LLMContextRecall()],
