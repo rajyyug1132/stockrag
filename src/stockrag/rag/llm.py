@@ -33,4 +33,14 @@ def get_llm(provider: str | None = None) -> BaseChatModel:
             temperature=0.2,
             google_api_key=settings.gemini_api_key,
         )
-    raise ValueError(f"Unknown LLM provider: {provider!r} (expected 'ollama' or 'gemini')")
+    if provider == "nvidia":
+        from langchain_openai import ChatOpenAI
+
+        # NIM is OpenAI-compatible; thinking mode left off (judge/RAG want answers, not <think>).
+        return ChatOpenAI(
+            model=settings.nvidia_model,
+            temperature=0.2,
+            api_key=settings.nvidia_api_key,
+            base_url=settings.nvidia_base_url,
+        )
+    raise ValueError(f"Unknown LLM provider: {provider!r} (expected 'ollama', 'gemini', or 'nvidia')")

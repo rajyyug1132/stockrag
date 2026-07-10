@@ -51,11 +51,11 @@ def main() -> int:
 
     from stockrag.config import settings
 
-    if not settings.gemini_api_key:
-        print("ERROR: GEMINI_API_KEY is required (Ragas judge). Set it in .env or the environment.")
+    judge_keys = {"gemini": settings.gemini_api_key, "nvidia": settings.nvidia_api_key}
+    if settings.llm_provider in judge_keys and not judge_keys[settings.llm_provider]:
+        print(f"ERROR: {settings.llm_provider.upper()}_API_KEY is required (Ragas judge). Set it in .env or the environment.")
         return 2
 
-    from langchain_google_genai import ChatGoogleGenerativeAI
     from ragas import EvaluationDataset, evaluate
     from ragas.dataset_schema import SingleTurnSample
     from ragas.embeddings import LangchainEmbeddingsWrapper
@@ -101,16 +101,12 @@ def main() -> int:
         if args.sleep:
             time.sleep(args.sleep)
 
-    judge = LangchainLLMWrapper(
-        ChatGoogleGenerativeAI(
-            model=settings.gemini_model,
-            temperature=0.0,
-            google_api_key=settings.gemini_api_key,
-        )
-    )
+    from stockrag.rag.llm import get_llm
+
+    judge = LangchainLLMWrapper(get_llm())
     embeddings = LangchainEmbeddingsWrapper(get_embeddings())
 
-    print("Scoring with Ragas (Gemini judge, max_workers=1 for free-tier RPM)...")
+    print(f"Scoring with Ragas ({settings.llm_provider} judge, max_workers=1 for free-tier RPM)...")
     result = evaluate(
         EvaluationDataset(samples=samples),
         metrics=[Faithfulness(), AnswerRelevancy(), LLMContextPrecisionWithReference(), LLMContextRecall()],

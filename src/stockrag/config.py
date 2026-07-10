@@ -25,9 +25,14 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
-    llm_provider: str = "gemini"  # "gemini" (API, default for now) or "ollama" (local)
+    llm_provider: str = "nvidia"  # "nvidia" (NIM API), "gemini" (API), or "ollama" (local)
     ollama_model: str = "qwen3:4b"  # fits ~5GB free RAM; qwen3:14b needs 8.4GB
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.5-flash"  # 2.5-flash is 404 for new API keys
+
+    # NVIDIA NIM (OpenAI-compatible); free endpoint, no daily-20 cap like Gemini free tier.
+    nvidia_api_key: str = ""
+    nvidia_model: str = "nvidia/nemotron-3-ultra-550b-a55b"  # slow (2-4min/call); swap to lighter NIM model if judge timeouts hurt
+    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
 
     chunk_tokens: int = 650
     chunk_overlap_tokens: int = 100
