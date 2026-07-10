@@ -40,8 +40,8 @@ Production-grade stock research tooling that automates both halves of the
 ```
 
 Retrieval is fully local (embeddings + BM25 + reranker all run on CPU).
-Only answer generation (and eval judging) can call out — to Gemini, or to a
-local Ollama model, switchable per request.
+Only answer generation (and eval judging) can call out — to NVIDIA NIM
+(default), Gemini, or a local Ollama model, switchable per request.
 
 ## Setup
 
@@ -50,7 +50,7 @@ no torch/chromadb wheels yet).
 
 ```powershell
 uv sync
-copy .env.example .env   # fill GEMINI_API_KEY (and optional Langfuse keys)
+copy .env.example .env   # fill NVIDIA_API_KEY (or GEMINI_API_KEY; optional Langfuse keys)
 ```
 
 Optional local LLM: install [Ollama](https://ollama.com) and
@@ -99,7 +99,8 @@ Piotroski F-Score 8/9, all flowchart checks passing — with explicit
 
 `eval/run_eval.py` runs the full pipeline over a golden QA dataset and
 scores it with [Ragas](https://docs.ragas.io) (faithfulness, answer
-relevancy, context precision/recall — Gemini judge, local embeddings), plus
+relevancy, context precision/recall — judge follows the configured LLM
+provider, local embeddings), plus
 two locally computed gates: **citation coverage** (groundedness proxy) and
 **refusal accuracy** on deliberately unanswerable questions.
 
