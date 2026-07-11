@@ -1,4 +1,6 @@
-const BASE_URL = '/api'
+// Dev: Vite proxies /api -> localhost:8000 (see vite.config.ts). Prod (Vercel):
+// set VITE_API_URL to the deployed API origin (e.g. the HF Space URL).
+const BASE_URL = import.meta.env.VITE_API_URL ?? '/api'
 
 export interface FactorReport {
   ticker: string
@@ -53,6 +55,27 @@ export async function ask(question: string, ticker: string, llm?: string): Promi
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question, ticker, llm }),
   })
+  if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
+  return res.json()
+}
+
+export interface ThesisSection {
+  topic: string
+  question: string
+  answer: string
+  grounding: number
+  sources: Source[]
+}
+
+export interface ThesisResponse {
+  ticker: string
+  synthesis: string
+  sections: ThesisSection[]
+  prompt_version: string
+}
+
+export async function getThesis(ticker: string): Promise<ThesisResponse> {
+  const res = await fetch(`${BASE_URL}/thesis/${encodeURIComponent(ticker)}`)
   if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
   return res.json()
 }

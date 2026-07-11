@@ -1,4 +1,4 @@
-type View = 'ask' | 'factors' | 'metrics'
+type View = 'ask' | 'thesis' | 'factors' | 'metrics'
 
 interface HeaderProps {
   activeView: View
@@ -8,6 +8,7 @@ interface HeaderProps {
 export default function Header({ activeView, onViewChange }: HeaderProps) {
   const tabs: { id: View; label: string }[] = [
     { id: 'ask', label: 'Ask' },
+    { id: 'thesis', label: 'Thesis' },
     { id: 'factors', label: 'Factors' },
     { id: 'metrics', label: 'Metrics' },
   ]

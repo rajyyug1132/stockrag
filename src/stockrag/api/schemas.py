@@ -26,3 +26,18 @@ class AskResponse(BaseModel):
     answer: str
     sources: list[SourceOut]
     prompt_version: str
+
+
+class ThesisSectionOut(BaseModel):
+    topic: str
+    question: str
+    answer: str
+    grounding: float
+    sources: list[SourceOut]
+
+
+class ThesisResponse(BaseModel):
+    ticker: str
+    synthesis: str
+    sections: list[ThesisSectionOut]
+    prompt_version: str

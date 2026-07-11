@@ -1,16 +1,33 @@
 import json
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
 from stockrag.api.docs import DOCS_HTML
-from stockrag.api.schemas import AskRequest, AskResponse, IngestResponse, SourceOut
+from stockrag.api.schemas import (
+    AskRequest,
+    AskResponse,
+    IngestResponse,
+    SourceOut,
+    ThesisResponse,
+    ThesisSectionOut,
+)
 from stockrag.factor_engine.report import FactorReport, build_factor_report
 from stockrag.ingestion.pipeline import ingest_ticker
 from stockrag.rag.answer import ask as rag_ask
 from stockrag.rag.metrics import metrics_path
+from stockrag.rag.thesis import build_thesis
 
 app = FastAPI(title="StockRAG", docs_url=None)
+
+# Frontend is deployed on a different origin (Vercel) than the API (HF Spaces).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/docs", include_in_schema=False)
@@ -49,6 +66,31 @@ def ingest(ticker: str, forms: str = "10-K", years: int = 2) -> IngestResponse:
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return IngestResponse(ticker=ticker.upper(), **result.__dict__)
+
+
+@app.get("/thesis/{ticker}")
+def get_thesis(ticker: str, llm: str | None = None) -> ThesisResponse:
+    """Evidence briefing: factor report + filing evidence, synthesized.
+    Slow (several LLM calls); ingest the ticker first."""
+    try:
+        result = build_thesis(ticker, llm_provider=llm)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return ThesisResponse(
+        ticker=result.ticker,
+        synthesis=result.synthesis,
+        sections=[
+            ThesisSectionOut(
+                topic=s.topic,
+                question=s.question,
+                answer=s.result.answer,
+                grounding=s.grounding,
+                sources=[SourceOut(**src.__dict__) for src in s.result.sources],
+            )
+            for s in result.sections
+        ],
+        prompt_version=result.prompt_version,
+    )
 
 
 @app.post("/ask")
