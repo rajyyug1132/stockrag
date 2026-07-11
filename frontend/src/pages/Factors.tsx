@@ -27,92 +27,81 @@ export default function Factors() {
 
   const formatMetric = (value: number | null): string => {
     if (value === null) return '—'
-    if (typeof value === 'number') {
-      if (value > 100) return value.toFixed(0)
-      if (value > 1) return value.toFixed(2)
-      return value.toFixed(4)
-    }
-    return String(value)
+    if (Math.abs(value) > 100) return value.toFixed(0)
+    if (Math.abs(value) > 1) return value.toFixed(2)
+    return value.toFixed(4)
   }
 
+  const rows: { label: string; value: string; note: string }[] = data
+    ? [
+        { label: 'ROE', value: `${formatMetric(data.roe_pct)}%`, note: 'Return on equity' },
+        { label: 'Net Margin', value: `${formatMetric(data.net_margin_pct)}%`, note: 'Net profit margin' },
+        { label: 'P/E Ratio', value: formatMetric(data.pe_ratio), note: 'Price-to-earnings' },
+        { label: 'Piotroski F-Score', value: `${data.piotroski_score ?? '—'}/9`, note: 'Financial health score' },
+        { label: 'Beta', value: formatMetric(data.beta), note: 'Volatility vs. market' },
+      ]
+    : []
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <form onSubmit={handleFetch} className="flex flex-col gap-2">
-        <label className="text-sm font-medium">Company Ticker</label>
-        <div className="flex gap-2">
+        <label className="text-xs uppercase tracking-kicker text-ink-faint">Company Ticker</label>
+        <div className="flex gap-3">
           <input
             type="text"
             value={ticker}
             onChange={(e) => setTicker(e.target.value.toUpperCase())}
             placeholder="AAPL, MSFT, TSLA, ..."
             maxLength={5}
-            className="border border-gray-300 px-3 py-2 text-sm flex-1"
+            className="border border-line px-3 py-2 text-sm font-mono w-48"
           />
           <button
             type="submit"
             disabled={loading || !ticker.trim()}
-            className="bg-accent text-white px-4 py-2 text-sm font-medium hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="bg-ink text-bg px-5 py-2 text-sm font-semibold hover:bg-ink-dim disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed"
           >
-            {loading ? 'Loading...' : 'Get Factors'}
+            {loading ? 'Loading…' : 'Get Factors'}
           </button>
         </div>
       </form>
 
       {error && (
-        <div className="p-3 bg-white border border-red-300 text-red-600 text-sm rounded">
+        <div className="px-3 py-2 border border-err text-err text-sm">
           {error}
         </div>
       )}
 
       {data && (
-        <div className="border border-gray-300 overflow-x-auto">
+        <div className="border-t border-line">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-300 bg-gray-50">
-                <th className="text-left px-3 py-2 text-sm font-bold">Metric</th>
-                <th className="text-right px-3 py-2 text-sm font-bold">Value</th>
-                <th className="text-left px-3 py-2 text-sm font-bold text-gray-600">Notes</th>
+              <tr>
+                <th className="text-xs uppercase tracking-kicker text-ink-faint font-medium px-0 py-3 bg-transparent">Metric</th>
+                <th className="text-right text-xs uppercase tracking-kicker text-ink-faint font-medium px-3 py-3 bg-transparent">Value</th>
+                <th className="text-left text-xs uppercase tracking-kicker text-ink-faint font-medium px-3 py-3 bg-transparent">Notes</th>
               </tr>
             </thead>
             <tbody className="text-sm">
-              <tr className="border-b border-gray-300 hover:bg-gray-50">
-                <td className="px-3 py-2 font-medium">ROE</td>
-                <td className="px-3 py-2 text-right font-mono">{formatMetric(data.roe_pct)}%</td>
-                <td className="px-3 py-2 text-gray-600">Return on equity</td>
-              </tr>
-              <tr className="border-b border-gray-300 hover:bg-gray-50">
-                <td className="px-3 py-2 font-medium">Net Margin</td>
-                <td className="px-3 py-2 text-right font-mono">{formatMetric(data.net_margin_pct)}%</td>
-                <td className="px-3 py-2 text-gray-600">Net profit margin</td>
-              </tr>
-              <tr className="border-b border-gray-300 hover:bg-gray-50">
-                <td className="px-3 py-2 font-medium">P/E Ratio</td>
-                <td className="px-3 py-2 text-right font-mono">{formatMetric(data.pe_ratio)}</td>
-                <td className="px-3 py-2 text-gray-600">Price-to-earnings</td>
-              </tr>
-              <tr className="border-b border-gray-300 hover:bg-gray-50">
-                <td className="px-3 py-2 font-medium">Piotroski F-Score</td>
-                <td className="px-3 py-2 text-right font-mono">{data.piotroski_score ?? '—'}/9</td>
-                <td className="px-3 py-2 text-gray-600">Financial health score</td>
-              </tr>
-              <tr className="border-b border-gray-300 hover:bg-gray-50">
-                <td className="px-3 py-2 font-medium">Beta</td>
-                <td className="px-3 py-2 text-right font-mono">{formatMetric(data.beta)}</td>
-                <td className="px-3 py-2 text-gray-600">Volatility vs. market</td>
-              </tr>
+              {rows.map((row) => (
+                <tr key={row.label} className="hover:bg-surface transition-colors">
+                  <td className="px-0 py-3 font-medium text-ink">{row.label}</td>
+                  <td className="px-3 py-3 text-right font-mono text-lg text-ink">{row.value}</td>
+                  <td className="px-3 py-3 text-ink-faint">{row.note}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
 
           {data.missing.length > 0 && (
-            <div className="px-3 py-2 bg-gray-50 border-t border-gray-300 text-xs text-gray-600">
-              <strong>Missing data:</strong> {data.missing.join(', ')}
-            </div>
+            <p className="py-3 text-xs text-ink-faint">
+              <span className="uppercase tracking-kicker">Missing data:</span> {data.missing.join(', ')}
+            </p>
           )}
         </div>
       )}
 
       {!data && !error && (
-        <p className="text-sm text-gray-500 text-center py-8">
+        <p className="text-sm text-ink-faint py-10">
           Enter a ticker to view financial factors from SEC XBRL data.
         </p>
       )}

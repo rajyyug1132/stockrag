@@ -13,21 +13,23 @@ export default function Header({ activeView, onViewChange }: HeaderProps) {
   ]
 
   return (
-    <header className="border-b border-gray-300 bg-white">
-      <div className="max-w-6xl mx-auto px-4 py-4 md:px-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold text-black">StockRAG</h1>
-          <p className="text-xs text-gray-600">SEC filings • factors • citations</p>
+    <header className="border-b border-line bg-bg">
+      <div className="max-w-6xl mx-auto px-4 pt-6 pb-0 md:px-6">
+        <div className="flex items-baseline justify-between mb-5">
+          <h1 className="text-4xl font-bold tracking-tightest text-ink">StockRAG</h1>
+          <p className="text-xs uppercase tracking-kicker text-ink-faint">
+            SEC filings · factors · citations
+          </p>
         </div>
-        <nav className="flex gap-6 border-t border-gray-300 pt-3">
+        <nav className="flex gap-7">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => onViewChange(tab.id)}
-              className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${
+              className={`pb-3 text-sm font-medium uppercase tracking-kicker border-b-2 transition-colors ${
                 activeView === tab.id
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-gray-600 hover:text-black'
+                  ? 'border-ink text-ink'
+                  : 'border-transparent text-ink-faint hover:text-ink-dim'
               }`}
             >
               {tab.label}

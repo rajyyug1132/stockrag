@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { ask } from '../lib/api'
-
 import type { Source } from '../lib/api'
 
 interface Message {
@@ -39,47 +38,43 @@ export default function Ask() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium">Ticker</label>
+        <label className="text-xs uppercase tracking-kicker text-ink-faint">Ticker</label>
         <input
           type="text"
           value={ticker}
           onChange={(e) => setTicker(e.target.value.toUpperCase())}
           placeholder="AAPL, MSFT, TSLA, ..."
           maxLength={5}
-          className="border border-gray-300 px-3 py-2 text-sm"
+          className="border border-line px-3 py-2 text-sm font-mono w-48"
         />
       </div>
 
-      <div className="border-t border-gray-300 pt-6">
-        <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+      <div className="border-t border-line pt-8">
+        <div className="space-y-6 mb-8 max-h-[28rem] overflow-y-auto">
           {messages.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-8">
-              Enter a ticker and ask a question about SEC filings.
+            <p className="text-sm text-ink-faint py-10">
+              Enter a ticker and ask a question about its SEC filings.
             </p>
           ) : (
             messages.map((msg, i) => (
-              <div key={i} className={`p-3 rounded border ${
-                msg.role === 'user'
-                  ? 'bg-gray-50 border-gray-300 text-black'
-                  : 'bg-white border-gray-300 text-black'
-              }`}>
-                <p className="text-xs font-bold mb-1">
+              <div key={i} className={msg.role === 'user' ? 'pl-0' : 'border-l border-line pl-4'}>
+                <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">
                   {msg.role === 'user' ? 'You' : 'StockRAG'}
                 </p>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink max-w-[72ch]">
                   {msg.content}
                 </p>
                 {msg.sources && msg.sources.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-gray-300">
-                    <p className="text-xs font-bold mb-2">Sources:</p>
+                  <div className="mt-4 pt-3 border-t border-line">
+                    <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">Sources</p>
                     <ul className="space-y-1">
                       {msg.sources.map((src) => (
-                        <li key={src.index} className="text-xs text-gray-600">
+                        <li key={src.index} className="text-xs text-ink-dim">
                           <span className="font-mono">[{src.index}]</span>{' '}
                           <span className="font-mono">{src.form}</span> {src.section}
-                          <span> — {src.filing_date}</span>
+                          <span className="text-ink-faint"> — {src.filing_date}</span>
                         </li>
                       ))}
                     </ul>
@@ -91,25 +86,25 @@ export default function Ask() {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-white border border-red-300 text-red-600 text-sm rounded">
+          <div className="mb-4 px-3 py-2 border border-err text-err text-sm">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleAsk} className="flex flex-col gap-2">
+        <form onSubmit={handleAsk} className="flex flex-col gap-3">
           <textarea
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="What are the key risks? Tell me about debt levels..."
             rows={3}
-            className="border border-gray-300 px-3 py-2 text-sm"
+            className="border border-line px-3 py-2 text-sm max-w-[72ch]"
           />
           <button
             type="submit"
             disabled={loading || !question.trim() || !ticker.trim()}
-            className="bg-accent text-white px-4 py-2 text-sm font-medium hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="self-start bg-ink text-bg px-5 py-2 text-sm font-semibold hover:bg-ink-dim disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed"
           >
-            {loading ? 'Asking...' : 'Ask'}
+            {loading ? 'Asking…' : 'Ask'}
           </button>
         </form>
       </div>
