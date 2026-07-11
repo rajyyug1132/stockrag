@@ -64,6 +64,53 @@ def ingest_html(
     return IngestResult(filings_ingested=1, filings_skipped=0, chunks_added=len(texts))
 
 
+def ingest_pdf(
+    path: str,
+    ticker: str,
+    form: str = "annual-report",
+    filing_date: str = "",
+    accession: str = "",
+) -> IngestResult:
+    """Ingest an Indian annual-report PDF (BSE/NSE). No network; the same
+    chunk -> embed -> store path as SEC filings, only the parser differs.
+    """
+    from stockrag.ingestion.parse_pdf import parse_pdf_sections
+
+    accession = accession or f"pdf:{ticker.upper()}:{filing_date or path}"
+    store = get_vector_store()
+    if accession_already_ingested(store, accession):
+        return IngestResult(filings_ingested=0, filings_skipped=1, chunks_added=0)
+
+    ref = FilingRef(
+        ticker=ticker.upper(),
+        cik=0,
+        accession_number=accession,
+        form=form,
+        filing_date=filing_date,
+        primary_document=path,
+    )
+    texts: list[str] = []
+    metadatas: list[dict] = []
+    for section in parse_pdf_sections(path):
+        for chunk in chunk_text(section.text, section.name):
+            texts.append(chunk.text)
+            metadatas.append(
+                {
+                    "ticker": ref.ticker,
+                    "form": ref.form,
+                    "filing_date": ref.filing_date,
+                    "accession": ref.accession_number,
+                    "section": chunk.section,
+                    "char_start": chunk.char_start,
+                    "char_end": chunk.char_end,
+                }
+            )
+    if texts:
+        ids = [f"{accession}:{i}" for i in range(len(texts))]
+        store.add_texts(texts=texts, metadatas=metadatas, ids=ids)
+    return IngestResult(filings_ingested=1, filings_skipped=0, chunks_added=len(texts))
+
+
 def ingest_ticker(ticker: str, forms: tuple[str, ...] = ("10-K",), years: int = 2) -> IngestResult:
     store = get_vector_store()
 

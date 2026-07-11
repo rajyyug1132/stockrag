@@ -51,13 +51,20 @@ def ingest_file(
     filing_date: str = "",
     accession: str = "local",
 ) -> None:
-    """Ingest a local filing HTML file (no EDGAR network access; CI-safe)."""
+    """Ingest a local filing into the vector store (no network; CI-safe).
+    HTML -> SEC section parser; PDF -> Indian annual-report parser."""
     from pathlib import Path
 
-    from stockrag.ingestion.pipeline import ingest_html
+    if Path(path).suffix.lower() == ".pdf":
+        from stockrag.ingestion.pipeline import ingest_pdf
 
-    html = Path(path).read_text(encoding="utf-8", errors="ignore")
-    result = ingest_html(html, ticker, form=form, filing_date=filing_date, accession=accession)
+        pdf_form = "annual-report" if form == "10-K" else form
+        result = ingest_pdf(path, ticker, form=pdf_form, filing_date=filing_date, accession=accession)
+    else:
+        from stockrag.ingestion.pipeline import ingest_html
+
+        html = Path(path).read_text(encoding="utf-8", errors="ignore")
+        result = ingest_html(html, ticker, form=form, filing_date=filing_date, accession=accession or "local")
     typer.echo(json.dumps(result.__dict__, indent=2))
 
 
