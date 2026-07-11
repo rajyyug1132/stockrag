@@ -1,0 +1,63 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+* { @apply border-gray-300; }
+
+html {
+  @apply text-gray-900 bg-white;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+  @apply font-sans;
+}
+
+h1, h2, h3 { @apply font-sans font-bold; }
+h1 { @apply text-3xl leading-tight; letter-spacing: -0.02em; }
+h2 { @apply text-xl leading-snug; }
+h3 { @apply text-lg; }
+
+code, pre {
+  @apply font-mono bg-gray-50 border border-gray-300 rounded;
+  padding: 4px 8px;
+}
+
+pre {
+  overflow-x: auto;
+  padding: 8px;
+}
+
+input:focus, textarea:focus, select:focus {
+  @apply outline-none ring-2 ring-accent border-accent;
+}
+
+button {
+  @apply font-sans font-medium text-sm cursor-pointer transition-colors;
+}
+
+button.primary {
+  @apply bg-accent text-white border border-accent hover:bg-blue-600;
+}
+
+button.secondary {
+  @apply bg-white text-gray-900 border border-gray-400 hover:bg-gray-100;
+}
+
+table {
+  @apply w-full border-collapse;
+}
+
+th {
+  @apply border-b border-gray-300 bg-gray-50 text-left font-bold px-2 py-2 text-sm;
+}
+
+td {
+  @apply border-b border-gray-300 px-2 py-2 text-sm;
+}
+
+@media (max-width: 640px) {
+  html { font-size: 13px; }
+}
