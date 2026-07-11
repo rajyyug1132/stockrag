@@ -24,14 +24,21 @@ export interface AskResponse {
   prompt_version: string
 }
 
+// Mirrors the records rag/metrics.py appends to requests.jsonl.
 export interface MetricsEntry {
   timestamp: string
   ticker: string
-  question: string
-  stage_latencies: Record<string, number>
-  token_usage: Record<string, number>
-  refusal: boolean
-  error: boolean
+  llm?: string
+  model?: string
+  prompt_version?: string
+  retrieval_ms?: number
+  llm_ms?: number
+  total_ms?: number
+  cost_usd?: number
+  citation_coverage?: number
+  refused?: boolean
+  error?: string
+  n_sources?: number
 }
 
 export async function getFactors(ticker: string): Promise<FactorReport> {

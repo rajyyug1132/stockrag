@@ -83,7 +83,11 @@ def ask(
     llm_provider: str | None = None,
 ) -> AnswerResult:
     provider = llm_provider or settings.llm_provider
-    model = settings.gemini_model if provider == "gemini" else settings.ollama_model
+    model = {
+        "gemini": settings.gemini_model,
+        "nvidia": settings.nvidia_model,
+        "ollama": settings.ollama_model,
+    }.get(provider, settings.ollama_model)
     config = {
         "callbacks": tracing_callbacks(),
         "run_name": "stockrag-ask",

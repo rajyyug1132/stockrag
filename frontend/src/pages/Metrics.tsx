@@ -20,13 +20,14 @@ export default function Metrics() {
     fetchMetrics()
   }, [])
 
+  const latencies = entries.filter(e => e.total_ms != null).map(e => e.total_ms as number)
   const stats = {
     totalQueries: entries.length,
     successRate: entries.length > 0
-      ? (((entries.length - entries.filter(e => e.error || e.refusal).length) / entries.length) * 100).toFixed(1)
+      ? (((entries.length - entries.filter(e => e.error || e.refused).length) / entries.length) * 100).toFixed(1)
       : 0,
-    avgLatency: entries.length > 0
-      ? (entries.reduce((sum, e) => sum + Object.values(e.stage_latencies).reduce((a, b) => a + b, 0), 0) / entries.length).toFixed(0)
+    avgLatency: latencies.length > 0
+      ? (latencies.reduce((a, b) => a + b, 0) / latencies.length).toFixed(0)
       : 0,
     uniqueTickers: new Set(entries.map(e => e.ticker)).size,
   }
@@ -65,25 +66,26 @@ export default function Metrics() {
               <tr className="border-b border-gray-300 bg-gray-50">
                 <th className="text-left px-3 py-2 font-bold">Timestamp</th>
                 <th className="text-left px-3 py-2 font-bold">Ticker</th>
-                <th className="text-left px-3 py-2 font-bold">Question</th>
+                <th className="text-left px-3 py-2 font-bold">Model</th>
                 <th className="text-right px-3 py-2 font-bold">Latency (ms)</th>
+                <th className="text-right px-3 py-2 font-bold">Coverage</th>
                 <th className="text-center px-3 py-2 font-bold">Status</th>
               </tr>
             </thead>
             <tbody>
               {entries.slice(0, 20).map((entry, i) => {
-                const totalLatency = Object.values(entry.stage_latencies).reduce((a, b) => a + b, 0)
-                const status = entry.error ? 'error' : entry.refusal ? 'refused' : 'ok'
+                const status = entry.error ? 'error' : entry.refused ? 'refused' : 'ok'
                 return (
                   <tr key={i} className="border-b border-gray-300 hover:bg-gray-50">
                     <td className="px-3 py-2 text-xs font-mono text-gray-600">
                       {new Date(entry.timestamp).toLocaleString()}
                     </td>
                     <td className="px-3 py-2 font-mono font-bold">{entry.ticker}</td>
-                    <td className="px-3 py-2 text-gray-700 truncate max-w-xs" title={entry.question}>
-                      {entry.question.slice(0, 50)}...
+                    <td className="px-3 py-2 text-xs font-mono text-gray-600">{entry.model ?? '—'}</td>
+                    <td className="px-3 py-2 text-right font-mono">{entry.total_ms ?? '—'}</td>
+                    <td className="px-3 py-2 text-right font-mono">
+                      {entry.citation_coverage != null ? `${(entry.citation_coverage * 100).toFixed(0)}%` : '—'}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono">{totalLatency.toFixed(0)}</td>
                     <td className="px-3 py-2 text-center">
                       <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${
                         status === 'ok' ? 'bg-green-100 text-green-700' :

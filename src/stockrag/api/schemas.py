@@ -11,7 +11,7 @@ class IngestResponse(BaseModel):
 class AskRequest(BaseModel):
     question: str
     ticker: str
-    llm: str | None = None  # "ollama" (default) or "gemini"
+    llm: str | None = None  # "nvidia" (default), "gemini", or "ollama"; None = configured default
 
 
 class SourceOut(BaseModel):

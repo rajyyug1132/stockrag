@@ -92,7 +92,7 @@ export default function Factors() {
               </tr>
               <tr className="border-b border-gray-300 hover:bg-gray-50">
                 <td className="px-3 py-2 font-medium">Piotroski F-Score</td>
-                <td className="px-3 py-2 text-right font-mono">{formatMetric(data.piotroski_score)}/9</td>
+                <td className="px-3 py-2 text-right font-mono">{data.piotroski_score ?? '—'}/9</td>
                 <td className="px-3 py-2 text-gray-600">Financial health score</td>
               </tr>
               <tr className="border-b border-gray-300 hover:bg-gray-50">

@@ -1,13 +1,14 @@
 """Offline RAG evaluation harness (Ragas).
 
 Runs the full ask() pipeline over a QA dataset and scores it with Ragas.
-The judge LLM is Gemini (needs GEMINI_API_KEY); embeddings are the local
-bge model, so only judging calls leave the machine.
+The judge LLM follows --llm (falling back to the configured default provider,
+needing its API key); embeddings are the local bge model, so only judging
+calls leave the machine.
 
 Usage:
-    uv run python eval/run_eval.py --subset smoke              # 8 questions (CI)
+    uv run python eval/run_eval.py --subset smoke              # 8 questions
     uv run python eval/run_eval.py --subset golden             # full set
-    uv run python eval/run_eval.py --subset smoke --llm gemini # generation via Gemini too (CI has no Ollama)
+    uv run python eval/run_eval.py --subset smoke --llm nvidia # CI (no Ollama there)
 
 Exits 1 when any gated metric falls below its threshold.
 """
@@ -47,7 +48,7 @@ def load_dataset(subset: str) -> list[dict]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--subset", choices=["smoke", "golden"], default="smoke")
-    parser.add_argument("--llm", default=None, help="Generation LLM provider: ollama (default) or gemini")
+    parser.add_argument("--llm", default=None, help="LLM provider for generation + judge: nvidia, gemini, or ollama")
     parser.add_argument("--sleep", type=float, default=0.0, help="Seconds to sleep between questions (API rate limits)")
     parser.add_argument("--limit", type=int, default=None, help="Only evaluate the first N questions (quota-constrained runs)")
     args = parser.parse_args()

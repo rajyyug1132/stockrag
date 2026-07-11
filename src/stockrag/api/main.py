@@ -1,3 +1,5 @@
+import json
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 
@@ -6,6 +8,7 @@ from stockrag.api.schemas import AskRequest, AskResponse, IngestResponse, Source
 from stockrag.factor_engine.report import FactorReport, build_factor_report
 from stockrag.ingestion.pipeline import ingest_ticker
 from stockrag.rag.answer import ask as rag_ask
+from stockrag.rag.metrics import metrics_path
 
 app = FastAPI(title="StockRAG", docs_url=None)
 
@@ -18,6 +21,16 @@ def custom_docs() -> HTMLResponse:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/metrics")
+def get_metrics() -> list[dict]:
+    """Recorded ask() requests, newest first (backs the frontend Metrics view)."""
+    path = metrics_path()
+    if not path.exists():
+        return []
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return rows[::-1]
 
 
 @app.get("/factors/{ticker}")
