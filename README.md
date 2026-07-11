@@ -111,7 +111,7 @@ uv run python eval/run_eval.py --subset smoke --limit 3  # quota-constrained
 ```
 
 The build fails when any gated metric drops below threshold (faithfulness
-≥ 0.75, relevancy ≥ 0.70, precision ≥ 0.60, citation coverage ≥ 0.60,
+≥ 0.75, relevancy ≥ 0.60, precision ≥ 0.60, citation coverage ≥ 0.60,
 refusal accuracy ≥ 0.50). GitHub Actions (`.github/workflows/eval.yml`)
 runs unit tests on every PR, then ingests a committed filing fixture
 (never hitting EDGAR from CI) and runs the smoke eval as a merge gate —
