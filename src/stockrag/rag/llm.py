@@ -36,11 +36,13 @@ def get_llm(provider: str | None = None) -> BaseChatModel:
     if provider == "nvidia":
         from langchain_openai import ChatOpenAI
 
-        # NIM is OpenAI-compatible; thinking mode left off (judge/RAG want answers, not <think>).
+        # NIM is OpenAI-compatible. enable_thinking=False: nemotron reasoning models
+        # otherwise put everything in reasoning_content and return empty content.
         return ChatOpenAI(
             model=settings.nvidia_model,
             temperature=0.2,
             api_key=settings.nvidia_api_key,
             base_url=settings.nvidia_base_url,
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
         )
     raise ValueError(f"Unknown LLM provider: {provider!r} (expected 'ollama', 'gemini', or 'nvidia')")

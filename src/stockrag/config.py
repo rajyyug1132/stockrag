@@ -31,7 +31,9 @@ class Settings(BaseSettings):
 
     # NVIDIA NIM (OpenAI-compatible); free endpoint, no daily-20 cap like Gemini free tier.
     nvidia_api_key: str = ""
-    nvidia_model: str = "nvidia/nemotron-3-ultra-550b-a55b"  # slow (2-4min/call); swap to lighter NIM model if judge timeouts hurt
+    # nemotron-super: ~3s/call, reliable capacity (NVIDIA-hosted). deepseek/llama free
+    # pools 503 under load; nemotron-3-ultra scores fine but 2-4min/call → judge timeouts.
+    nvidia_model: str = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
 
     chunk_tokens: int = 650
