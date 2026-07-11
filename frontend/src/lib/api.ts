@@ -10,13 +10,17 @@ export interface FactorReport {
   missing: string[]
 }
 
+export interface Source {
+  index: number
+  form: string
+  filing_date: string
+  section: string
+  accession: string
+}
+
 export interface AskResponse {
   answer: string
-  sources: Array<{
-    document: string
-    page: number | null
-    content: string
-  }>
+  sources: Source[]
   prompt_version: string
 }
 

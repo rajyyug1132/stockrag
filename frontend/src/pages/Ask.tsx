@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { ask } from '../lib/api'
 
+import type { Source } from '../lib/api'
+
 interface Message {
   role: 'user' | 'assistant'
   content: string
-  sources?: Array<{ document: string; page: number | null; content: string }>
+  sources?: Source[]
 }
 
 export default function Ask() {
@@ -73,10 +75,11 @@ export default function Ask() {
                   <div className="mt-3 pt-3 border-t border-gray-300">
                     <p className="text-xs font-bold mb-2">Sources:</p>
                     <ul className="space-y-1">
-                      {msg.sources.map((src, j) => (
-                        <li key={j} className="text-xs text-gray-600">
-                          <span className="font-mono">{src.document}</span>
-                          {src.page && <span> (p. {src.page})</span>}
+                      {msg.sources.map((src) => (
+                        <li key={src.index} className="text-xs text-gray-600">
+                          <span className="font-mono">[{src.index}]</span>{' '}
+                          <span className="font-mono">{src.form}</span> {src.section}
+                          <span> — {src.filing_date}</span>
                         </li>
                       ))}
                     </ul>
