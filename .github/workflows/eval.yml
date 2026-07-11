@@ -19,8 +19,9 @@ jobs:
 
   rag-eval:
     # Smoke eval gate: ingests a committed fixture (never hits EDGAR from CI)
-    # and scores 8 questions with Ragas. Requires the GEMINI_API_KEY secret
-    # for both generation (no Ollama in CI) and the judge.
+    # and scores 8 questions with Ragas. Requires the NVIDIA_API_KEY secret
+    # for both generation (no Ollama in CI) and the judge; Gemini free tier
+    # (20 req/day) cannot cover a smoke run.
     runs-on: ubuntu-latest
     needs: tests
     steps:
@@ -36,8 +37,8 @@ jobs:
           --form 10-K --filing-date 2025-10-31 --accession ci-fixture
       - name: Run smoke eval (Ragas gate)
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: uv run python eval/run_eval.py --subset smoke --llm gemini --sleep 6
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        run: uv run python eval/run_eval.py --subset smoke --llm nvidia --sleep 2
       - name: Upload eval results
         if: always()
         uses: actions/upload-artifact@v4

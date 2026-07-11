@@ -18,6 +18,6 @@
 
 ## CI
 - `master` is protected: `tests` + `rag-eval` checks must pass, branch up-to-date.
-- CI eval runs `--llm gemini` with the `GEMINI_API_KEY` secret; no `NVIDIA_API_KEY`
-  secret exists yet.
+- CI eval runs `--llm nvidia` and needs the `NVIDIA_API_KEY` repo secret (Gemini
+  free tier's 20 req/day can't cover a smoke run).
 - CI never hits SEC EDGAR (fixture filing only). Keep it that way.
