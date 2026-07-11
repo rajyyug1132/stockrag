@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getMetrics, MetricsEntry } from '../lib/api'
+import { getMetrics, type MetricsEntry } from '../lib/api'
 
 export default function Metrics() {
   const [entries, setEntries] = useState<MetricsEntry[]>([])

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getFactors, FactorReport } from '../lib/api'
+import { getFactors, type FactorReport } from '../lib/api'
 
 export default function Factors() {
   const [ticker, setTicker] = useState('')
