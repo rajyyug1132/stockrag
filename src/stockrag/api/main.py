@@ -1,11 +1,18 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 
+from stockrag.api.docs import DOCS_HTML
 from stockrag.api.schemas import AskRequest, AskResponse, IngestResponse, SourceOut
 from stockrag.factor_engine.report import FactorReport, build_factor_report
 from stockrag.ingestion.pipeline import ingest_ticker
 from stockrag.rag.answer import ask as rag_ask
 
-app = FastAPI(title="StockRAG")
+app = FastAPI(title="StockRAG", docs_url=None)
+
+
+@app.get("/docs", include_in_schema=False)
+def custom_docs() -> HTMLResponse:
+    return HTMLResponse(DOCS_HTML)
 
 
 @app.get("/health")
