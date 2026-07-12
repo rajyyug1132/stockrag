@@ -108,7 +108,10 @@ def main() -> int:
 
     from stockrag.rag.llm import get_llm
 
-    judge = LangchainLLMWrapper(get_llm(judge_provider))
+    # nvidia judge uses a faster model than generation: Ragas fires ~4 long
+    # prompts per question and slow judge calls time out into NaN scores.
+    judge_model = settings.nvidia_judge_model if judge_provider == "nvidia" else None
+    judge = LangchainLLMWrapper(get_llm(judge_provider, judge_model))
     embeddings = LangchainEmbeddingsWrapper(get_embeddings())
 
     print(f"Scoring with Ragas ({judge_provider} judge, max_workers=1 for free-tier RPM)...")
@@ -117,7 +120,9 @@ def main() -> int:
         metrics=[Faithfulness(), AnswerRelevancy(), LLMContextPrecisionWithReference(), LLMContextRecall()],
         llm=judge,
         embeddings=embeddings,
-        run_config=RunConfig(max_workers=1),
+        # timeout: judge calls on shared NIM endpoints occasionally spike; the
+        # 180s default turned slow calls into NaN scores and false gate failures.
+        run_config=RunConfig(max_workers=1, timeout=300),
     )
 
     scores = {metric: float(value) for metric, value in result._repr_dict.items()}

@@ -78,7 +78,7 @@ def _format_docs(docs: list[Document]) -> tuple[str, list[Source]]:
 def ask(
     question: str,
     ticker: str,
-    prompt_version: str = "v2",
+    prompt_version: str = "v3",
     retriever: BaseRetriever | None = None,
     llm_provider: str | None = None,
 ) -> AnswerResult:

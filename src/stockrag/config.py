@@ -31,15 +31,22 @@ class Settings(BaseSettings):
 
     # NVIDIA NIM (OpenAI-compatible); free endpoint, no daily-20 cap like Gemini free tier.
     nvidia_api_key: str = ""
-    # nemotron-super: ~3s/call, reliable capacity (NVIDIA-hosted). deepseek/llama free
-    # pools 503 under load; nemotron-3-ultra scores fine but 2-4min/call → judge timeouts.
+    # Generation: nemotron-super cites reliably (~3-10s/answer). Judge: Ragas fires
+    # ~4 long prompts per question; nemotron-super ran 8-100s/call under CI load →
+    # mass judge timeouts, while mistral-nemotron answers judge prompts in ~1s.
     nvidia_model: str = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    nvidia_judge_model: str = "mistralai/mistral-nemotron"
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
 
     chunk_tokens: int = 650
     chunk_overlap_tokens: int = 100
 
     edgar_requests_per_second: float = 8.0
+
+    # When set, POST /ingest requires a matching X-Ingest-Token header —
+    # a public /ingest lets strangers burn LLM quota and hit EDGAR from the
+    # server's IP. Empty (default) leaves it open for local dev.
+    ingest_token: str = ""
 
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.filings_dir, self.facts_dir, self.chroma_dir):
