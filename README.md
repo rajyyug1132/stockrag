@@ -1,3 +1,15 @@
+---
+title: StockRAG API
+emoji: 📈
+colorFrom: yellow
+colorTo: gray
+sdk: gradio
+sdk_version: 5.12.0
+python_version: "3.12"
+app_file: app.py
+pinned: false
+---
+
 # StockRAG — Factor Engine + Ask-My-Docs RAG for SEC Filings
 
 [![Eval CI](https://github.com/rajyyug1132/stockrag/actions/workflows/eval.yml/badge.svg)](https://github.com/rajyyug1132/stockrag/actions/workflows/eval.yml)
