@@ -45,15 +45,20 @@ def _match_heading(line: str) -> str | None:
     return None
 
 
+# Sections shorter than this are TOC entries / page-header scraps, not content.
+# Calibrated on RIL IAR 2024: real sections run 8k-30k chars, TOC scraps <600.
+_MIN_SECTION_CHARS = 600
+
+
 def split_indian_sections(text: str) -> list[Section]:
     current_name = OTHER_SECTION
     current_lines: list[str] = []
-    sections: list[Section] = []
+    raw: list[Section] = []
 
     def flush() -> None:
         body = "\n".join(current_lines).strip()
         if body:
-            sections.append(Section(name=current_name, text=body))
+            raw.append(Section(name=current_name, text=body))
 
     for line in text.split("\n"):
         name = _match_heading(line)
@@ -65,7 +70,15 @@ def split_indian_sections(text: str) -> list[Section]:
             current_lines.append(line)
     flush()
 
-    return sections
+    # Repeated page headers re-trigger the same section dozens of times in a
+    # real annual report; coalesce adjacent same-name runs, then drop scraps.
+    merged: list[Section] = []
+    for section in raw:
+        if merged and merged[-1].name == section.name:
+            merged[-1] = Section(name=section.name, text=merged[-1].text + "\n" + section.text)
+        else:
+            merged.append(section)
+    return [s for s in merged if len(s.text) >= _MIN_SECTION_CHARS]
 
 
 def parse_pdf_sections(path: str) -> list[Section]:
