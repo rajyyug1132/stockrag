@@ -80,14 +80,20 @@ export async function getThesis(ticker: string): Promise<ThesisResponse> {
   return res.json()
 }
 
-export async function ingest(ticker: string, forms?: string, years?: number): Promise<void> {
-  const params = new URLSearchParams()
-  if (forms) params.append('forms', forms)
-  if (years) params.append('years', String(years))
-  const res = await fetch(`${BASE_URL}/ingest/${encodeURIComponent(ticker)}?${params}`, {
+export interface IngestResponse {
+  ticker: string
+  filings_ingested: number
+  filings_skipped: number
+  chunks_added: number
+}
+
+export async function ingest(ticker: string, token?: string): Promise<IngestResponse> {
+  const res = await fetch(`${BASE_URL}/ingest/${encodeURIComponent(ticker)}`, {
     method: 'POST',
+    headers: token ? { 'X-Ingest-Token': token } : {},
   })
   if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
+  return res.json()
 }
 
 export async function getMetrics(): Promise<MetricsEntry[]> {

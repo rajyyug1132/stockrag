@@ -1,10 +1,11 @@
 import json
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
 from stockrag.api.docs import DOCS_HTML
+from stockrag.config import settings
 from stockrag.api.schemas import (
     AskRequest,
     AskResponse,
@@ -59,7 +60,14 @@ def get_factors(ticker: str) -> FactorReport:
 
 
 @app.post("/ingest/{ticker}")
-def ingest(ticker: str, forms: str = "10-K", years: int = 2) -> IngestResponse:
+def ingest(
+    ticker: str,
+    forms: str = "10-K",
+    years: int = 2,
+    x_ingest_token: str = Header(default=""),
+) -> IngestResponse:
+    if settings.ingest_token and x_ingest_token != settings.ingest_token:
+        raise HTTPException(status_code=403, detail="Invalid or missing X-Ingest-Token header.")
     form_tuple = tuple(f.strip() for f in forms.split(","))
     try:
         result = ingest_ticker(ticker, forms=form_tuple, years=years)

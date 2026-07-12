@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ask } from '../lib/api'
+import { ask, ingest } from '../lib/api'
 import type { Source } from '../lib/api'
 
 interface Message {
@@ -14,6 +14,27 @@ export default function Ask() {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [ingesting, setIngesting] = useState(false)
+  const [ingestStatus, setIngestStatus] = useState('')
+  const [ingestToken, setIngestToken] = useState('')
+
+  const handleIngest = async () => {
+    if (!ticker.trim()) return
+    setIngesting(true)
+    setIngestStatus('')
+    try {
+      const r = await ingest(ticker, ingestToken || undefined)
+      setIngestStatus(
+        r.filings_ingested > 0
+          ? `Ingested ${r.filings_ingested} filing(s), ${r.chunks_added} chunks.`
+          : 'Already ingested.'
+      )
+    } catch (err) {
+      setIngestStatus(err instanceof Error ? `Ingest failed — ${err.message}` : 'Ingest failed')
+    } finally {
+      setIngesting(false)
+    }
+  }
 
   const handleAsk = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,14 +62,32 @@ export default function Ask() {
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
         <label className="text-xs uppercase tracking-kicker text-ink-faint">Ticker</label>
-        <input
-          type="text"
-          value={ticker}
-          onChange={(e) => setTicker(e.target.value.toUpperCase())}
-          placeholder="AAPL, MSFT, TSLA, ..."
-          maxLength={5}
-          className="border border-line px-3 py-2 text-sm font-mono w-48"
-        />
+        <div className="flex gap-3 items-center flex-wrap">
+          <input
+            type="text"
+            value={ticker}
+            onChange={(e) => setTicker(e.target.value.toUpperCase())}
+            placeholder="AAPL, MSFT, TSLA, ..."
+            maxLength={5}
+            className="border border-line px-3 py-2 text-sm font-mono w-48"
+          />
+          <button
+            type="button"
+            onClick={handleIngest}
+            disabled={ingesting || !ticker.trim()}
+            className="border border-line text-ink-dim px-4 py-2 text-sm hover:text-ink hover:border-ink-faint disabled:text-ink-faint disabled:cursor-not-allowed"
+          >
+            {ingesting ? 'Ingesting… (~1 min)' : 'Ingest filings'}
+          </button>
+          <input
+            type="password"
+            value={ingestToken}
+            onChange={(e) => setIngestToken(e.target.value)}
+            placeholder="ingest token (if required)"
+            className="border border-line px-3 py-2 text-xs w-52"
+          />
+        </div>
+        {ingestStatus && <p className="text-xs text-ink-dim">{ingestStatus}</p>}
       </div>
 
       <div className="border-t border-line pt-8">
