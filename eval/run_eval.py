@@ -110,8 +110,9 @@ def main() -> int:
 
     # nvidia judge uses a faster model than generation: Ragas fires ~4 long
     # prompts per question and slow judge calls time out into NaN scores.
+    # temperature=0.0: a grader must be deterministic or scores swing run-to-run.
     judge_model = settings.nvidia_judge_model if judge_provider == "nvidia" else None
-    judge = LangchainLLMWrapper(get_llm(judge_provider, judge_model))
+    judge = LangchainLLMWrapper(get_llm(judge_provider, judge_model, temperature=0.0))
     embeddings = LangchainEmbeddingsWrapper(get_embeddings())
 
     print(f"Scoring with Ragas ({judge_provider} judge, max_workers=1 for free-tier RPM)...")

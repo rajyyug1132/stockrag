@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     # ~4 long prompts per question; nemotron-super ran 8-100s/call under CI load →
     # mass judge timeouts, while mistral-nemotron answers judge prompts in ~1s.
     nvidia_model: str = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    # mistral-nemotron: ~1s/call. Earlier verdict swings (faithfulness 0.86 ->
+    # 0.375 same input) were the judge running at temperature 0.2, not the
+    # model — run_eval now pins the judge to temperature 0.0.
     nvidia_judge_model: str = "mistralai/mistral-nemotron"
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
 
