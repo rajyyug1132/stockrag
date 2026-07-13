@@ -11,7 +11,7 @@ class IngestResponse(BaseModel):
 class AskRequest(BaseModel):
     question: str
     ticker: str
-    llm: str | None = None  # "ollama" (default) or "gemini"
+    llm: str | None = None  # "nvidia" (default), "gemini", or "ollama"; None = configured default
 
 
 class SourceOut(BaseModel):
@@ -25,4 +25,19 @@ class SourceOut(BaseModel):
 class AskResponse(BaseModel):
     answer: str
     sources: list[SourceOut]
+    prompt_version: str
+
+
+class ThesisSectionOut(BaseModel):
+    topic: str
+    question: str
+    answer: str
+    grounding: float
+    sources: list[SourceOut]
+
+
+class ThesisResponse(BaseModel):
+    ticker: str
+    synthesis: str
+    sections: list[ThesisSectionOut]
     prompt_version: str

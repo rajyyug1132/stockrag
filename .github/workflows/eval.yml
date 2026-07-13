@@ -18,9 +18,15 @@ jobs:
         run: uv run pytest -q
 
   rag-eval:
-    # Smoke eval gate: ingests a committed fixture (never hits EDGAR from CI)
-    # and scores 8 questions with Ragas. Requires the GEMINI_API_KEY secret
-    # for both generation (no Ollama in CI) and the judge.
+    # Deterministic eval gate: fully offline, no API keys, no LLM calls.
+    # Live gen+judge in CI proved non-reproducible (free shared endpoints;
+    # identical inputs scored faithfulness 0.86 -> 0.375 -> 0.0 across runs),
+    # so CI scores a frozen answer fixture with regex-based metrics only
+    # (citation_coverage, refusal_accuracy). Judge metrics run locally as
+    # advisory. Regenerate the fixture after pipeline changes with:
+    #   uv run python eval/run_eval.py --subset smoke --freeze eval/fixtures/smoke_answers.json
+    # The ingest step stays: it's a real, deterministic integration test of
+    # the parse -> chunk -> embed -> store pipeline (never hits EDGAR).
     runs-on: ubuntu-latest
     needs: tests
     steps:
@@ -34,10 +40,8 @@ jobs:
         run: >
           uv run stockrag ingest-file tests/fixtures/aapl_10k_excerpt.html AAPL
           --form 10-K --filing-date 2025-10-31 --accession ci-fixture
-      - name: Run smoke eval (Ragas gate)
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: uv run python eval/run_eval.py --subset smoke --llm gemini --sleep 6
+      - name: Run frozen smoke eval (deterministic gate)
+        run: uv run python eval/run_eval.py --subset smoke --frozen eval/fixtures/smoke_answers.json --no-judge
       - name: Upload eval results
         if: always()
         uses: actions/upload-artifact@v4

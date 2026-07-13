@@ -7,6 +7,7 @@ from langchain_core.retrievers import BaseRetriever
 
 from stockrag.config import settings
 from stockrag.rag.llm import get_llm
+from stockrag.rag.expand import expand_docs
 from stockrag.rag.metrics import citation_coverage, estimate_cost_usd, record_request
 from stockrag.rag.prompts import load_prompt
 from stockrag.rag.store import get_vector_store
@@ -78,12 +79,16 @@ def _format_docs(docs: list[Document]) -> tuple[str, list[Source]]:
 def ask(
     question: str,
     ticker: str,
-    prompt_version: str = "v2",
+    prompt_version: str = "v3",
     retriever: BaseRetriever | None = None,
     llm_provider: str | None = None,
 ) -> AnswerResult:
     provider = llm_provider or settings.llm_provider
-    model = settings.gemini_model if provider == "gemini" else settings.ollama_model
+    model = {
+        "gemini": settings.gemini_model,
+        "nvidia": settings.nvidia_model,
+        "ollama": settings.ollama_model,
+    }.get(provider, settings.ollama_model)
     config = {
         "callbacks": tracing_callbacks(),
         "run_name": "stockrag-ask",
@@ -104,6 +109,10 @@ def ask(
                 answer=NO_CONTEXT_MESSAGE, sources=[], prompt_version=prompt_version, contexts=[]
             )
 
+        # Small-to-big: widen each reranked chunk to its section neighbours so
+        # the LLM sees surrounding context; citations still map to the retrieved
+        # chunk's metadata.
+        docs = expand_docs(docs, ticker, window=settings.parent_window)
         context, sources = _format_docs(docs)
         chain = load_prompt(prompt_version) | get_llm(llm_provider)
         llm_started = time.perf_counter()

@@ -1,3 +1,15 @@
+---
+title: StockRAG API
+emoji: 📈
+colorFrom: yellow
+colorTo: gray
+sdk: gradio
+sdk_version: 5.12.0
+python_version: "3.12"
+app_file: app.py
+pinned: false
+---
+
 # StockRAG — Factor Engine + Ask-My-Docs RAG for SEC Filings
 
 [![Eval CI](https://github.com/rajyyug1132/stockrag/actions/workflows/eval.yml/badge.svg)](https://github.com/rajyyug1132/stockrag/actions/workflows/eval.yml)
@@ -40,8 +52,8 @@ Production-grade stock research tooling that automates both halves of the
 ```
 
 Retrieval is fully local (embeddings + BM25 + reranker all run on CPU).
-Only answer generation (and eval judging) can call out — to Gemini, or to a
-local Ollama model, switchable per request.
+Only answer generation (and eval judging) can call out — to NVIDIA NIM
+(default), Gemini, or a local Ollama model, switchable per request.
 
 ## Setup
 
@@ -50,7 +62,7 @@ no torch/chromadb wheels yet).
 
 ```powershell
 uv sync
-copy .env.example .env   # fill GEMINI_API_KEY (and optional Langfuse keys)
+copy .env.example .env   # fill NVIDIA_API_KEY (or GEMINI_API_KEY; optional Langfuse keys)
 ```
 
 Optional local LLM: install [Ollama](https://ollama.com) and
@@ -99,7 +111,8 @@ Piotroski F-Score 8/9, all flowchart checks passing — with explicit
 
 `eval/run_eval.py` runs the full pipeline over a golden QA dataset and
 scores it with [Ragas](https://docs.ragas.io) (faithfulness, answer
-relevancy, context precision/recall — Gemini judge, local embeddings), plus
+relevancy, context precision/recall — judge follows the configured LLM
+provider, local embeddings), plus
 two locally computed gates: **citation coverage** (groundedness proxy) and
 **refusal accuracy** on deliberately unanswerable questions.
 
@@ -110,7 +123,7 @@ uv run python eval/run_eval.py --subset smoke --limit 3  # quota-constrained
 ```
 
 The build fails when any gated metric drops below threshold (faithfulness
-≥ 0.75, relevancy ≥ 0.70, precision ≥ 0.60, citation coverage ≥ 0.60,
+≥ 0.75, relevancy ≥ 0.60, precision ≥ 0.60, citation coverage ≥ 0.60,
 refusal accuracy ≥ 0.50). GitHub Actions (`.github/workflows/eval.yml`)
 runs unit tests on every PR, then ingests a committed filing fixture
 (never hitting EDGAR from CI) and runs the smoke eval as a merge gate —

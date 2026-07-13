@@ -1,0 +1,9 @@
+frontend/
+data/
+tests/
+eval/
+.venv/
+.git/
+.claude/
+*.md
+!README.md
