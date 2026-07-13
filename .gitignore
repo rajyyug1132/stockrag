@@ -14,3 +14,7 @@ data/
 .env
 eval/results/
 *.log
+
+# Local tool output
+graphify-out/
+.impeccable/
