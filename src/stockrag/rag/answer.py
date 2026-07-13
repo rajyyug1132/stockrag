@@ -7,6 +7,7 @@ from langchain_core.retrievers import BaseRetriever
 
 from stockrag.config import settings
 from stockrag.rag.llm import get_llm
+from stockrag.rag.expand import expand_docs
 from stockrag.rag.metrics import citation_coverage, estimate_cost_usd, record_request
 from stockrag.rag.prompts import load_prompt
 from stockrag.rag.store import get_vector_store
@@ -108,6 +109,10 @@ def ask(
                 answer=NO_CONTEXT_MESSAGE, sources=[], prompt_version=prompt_version, contexts=[]
             )
 
+        # Small-to-big: widen each reranked chunk to its section neighbours so
+        # the LLM sees surrounding context; citations still map to the retrieved
+        # chunk's metadata.
+        docs = expand_docs(docs, ticker, window=settings.parent_window)
         context, sources = _format_docs(docs)
         chain = load_prompt(prompt_version) | get_llm(llm_provider)
         llm_started = time.perf_counter()

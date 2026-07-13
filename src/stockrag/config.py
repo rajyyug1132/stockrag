@@ -43,6 +43,10 @@ class Settings(BaseSettings):
 
     chunk_tokens: int = 650
     chunk_overlap_tokens: int = 100
+    # Small-to-big retrieval: widen each reranked chunk by N section neighbours
+    # on each side before sending to the LLM. 0 disables; raise if answers lack
+    # surrounding context, lower if the prompt gets too long.
+    parent_window: int = 1
 
     edgar_requests_per_second: float = 8.0
 
