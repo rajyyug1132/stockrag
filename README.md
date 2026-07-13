@@ -3,10 +3,8 @@ title: StockRAG API
 emoji: 📈
 colorFrom: yellow
 colorTo: gray
-sdk: gradio
-sdk_version: 5.12.0
-python_version: "3.12"
-app_file: app.py
+sdk: docker
+app_port: 7860
 pinned: false
 ---
 
