@@ -17,8 +17,10 @@ export default function Header({ activeView, onViewChange }: HeaderProps) {
     <header className="border-b border-line bg-bg">
       <div className="max-w-6xl mx-auto px-4 pt-6 pb-0 md:px-6">
         <div className="flex items-baseline justify-between mb-5">
-          <h1 className="text-4xl font-bold tracking-tightest text-ink">StockRAG</h1>
-          <p className="text-xs uppercase tracking-kicker text-ink-faint">
+          <span className="font-mono text-xl font-semibold text-ink">
+            StockRAG<span className="text-accent">.ai</span>
+          </span>
+          <p className="text-xs uppercase tracking-kicker text-ink-faint font-mono">
             SEC filings · factors · citations
           </p>
         </div>
@@ -27,9 +29,9 @@ export default function Header({ activeView, onViewChange }: HeaderProps) {
             <button
               key={tab.id}
               onClick={() => onViewChange(tab.id)}
-              className={`pb-3 text-sm font-medium uppercase tracking-kicker border-b-2 transition-colors ${
+              className={`pb-3 text-sm font-mono uppercase tracking-kicker border-b-2 transition-colors ${
                 activeView === tab.id
-                  ? 'border-ink text-ink'
+                  ? 'border-accent text-accent'
                   : 'border-transparent text-ink-faint hover:text-ink-dim'
               }`}
             >

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ask, ingest } from '../lib/api'
+import { askStream, ingest } from '../lib/api'
 import type { Source } from '../lib/api'
 
 interface Message {
@@ -43,25 +43,33 @@ export default function Ask() {
     setLoading(true)
     setError('')
 
+    const q = question
+    setQuestion('')
+    // Placeholder assistant message that streaming tokens append into.
+    setMessages((prev) => [...prev, { role: 'user', content: q }, { role: 'assistant', content: '' }])
+    const patchLast = (patch: (last: Message) => Message) =>
+      setMessages((prev) => [...prev.slice(0, -1), patch(prev[prev.length - 1])])
+
     try {
-      const response = await ask(question, ticker)
-      setMessages((prev) => [
-        ...prev,
-        { role: 'user', content: question },
-        { role: 'assistant', content: response.answer, sources: response.sources },
-      ])
-      setQuestion('')
+      const response = await askStream(q, ticker, (token) =>
+        patchLast((last) => ({ ...last, content: last.content + token }))
+      )
+      // Server's validated answer wins over the streamed accumulation.
+      patchLast(() => ({ role: 'assistant', content: response.answer, sources: response.sources }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get answer')
+      // Drop the user turn + empty assistant placeholder; restore the question.
+      setMessages((prev) => prev.slice(0, -2))
+      setQuestion(q)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-2">
-        <label className="text-xs uppercase tracking-kicker text-ink-faint">Ticker</label>
+    <div className="flex flex-col gap-8 max-w-3xl mx-auto w-full">
+      <div className="flex flex-col gap-2 border border-line bg-surface p-5 rounded-xl hover-lift">
+        <label className="text-xs uppercase tracking-kicker text-accent-dim font-mono">Ticker</label>
         <div className="flex gap-3 items-center flex-wrap">
           <input
             type="text"
@@ -69,13 +77,13 @@ export default function Ask() {
             onChange={(e) => setTicker(e.target.value.toUpperCase())}
             placeholder="AAPL, MSFT, TSLA, ..."
             maxLength={5}
-            className="border border-line px-3 py-2 text-sm font-mono w-48"
+            className="text-sm font-mono w-48"
           />
           <button
             type="button"
             onClick={handleIngest}
             disabled={ingesting || !ticker.trim()}
-            className="border border-line text-ink-dim px-4 py-2 text-sm hover:text-ink hover:border-ink-faint disabled:text-ink-faint disabled:cursor-not-allowed"
+            className="border border-line text-ink-dim px-4 py-2.5 text-sm rounded-md hover:text-ink hover:border-ink-faint disabled:text-ink-faint disabled:cursor-not-allowed"
           >
             {ingesting ? 'Ingesting… (~1 min)' : 'Ingest filings'}
           </button>
@@ -84,7 +92,7 @@ export default function Ask() {
             value={ingestToken}
             onChange={(e) => setIngestToken(e.target.value)}
             placeholder="ingest token (if required)"
-            className="border border-line px-3 py-2 text-xs w-52"
+            className="text-xs w-52"
           />
         </div>
         {ingestStatus && <p className="text-xs text-ink-dim">{ingestStatus}</p>}
@@ -93,13 +101,14 @@ export default function Ask() {
       <div className="border-t border-line pt-8">
         <div className="space-y-6 mb-8 max-h-[28rem] overflow-y-auto">
           {messages.length === 0 ? (
-            <p className="text-sm text-ink-faint py-10">
-              Enter a ticker and ask a question about its SEC filings.
-            </p>
+            <div className="py-10 text-center">
+              <h2 className="text-3xl text-ink mb-2">Your filings, <span className="text-accent">answering for themselves.</span></h2>
+              <p className="text-sm text-ink-dim">Enter a ticker and ask a question about its SEC filings.</p>
+            </div>
           ) : (
             messages.map((msg, i) => (
-              <div key={i} className={msg.role === 'user' ? 'pl-0' : 'border-l border-line pl-4'}>
-                <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">
+              <div key={i} className={`animate-item ${msg.role === 'user' ? 'pl-0' : 'border border-line bg-surface p-4 rounded-xl'}`}>
+                <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2 font-mono">
                   {msg.role === 'user' ? 'You' : 'StockRAG'}
                 </p>
                 <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink max-w-[72ch]">
@@ -107,11 +116,11 @@ export default function Ask() {
                 </p>
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-line">
-                    <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">Sources</p>
-                    <ul className="space-y-1">
+                    <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2 font-mono">Sources</p>
+                    <ul className="flex flex-wrap gap-2">
                       {msg.sources.map((src) => (
-                        <li key={src.index} className="text-xs text-ink-dim">
-                          <span className="font-mono">[{src.index}]</span>{' '}
+                        <li key={src.index} className="text-xs text-ink-dim border border-line bg-sunken px-3 py-2 rounded-md">
+                          <span className="font-mono text-accent">[{src.index}]</span>{' '}
                           <span className="font-mono">{src.form}</span> {src.section}
                           <span className="text-ink-faint"> — {src.filing_date}</span>
                         </li>
@@ -136,12 +145,12 @@ export default function Ask() {
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="What are the key risks? Tell me about debt levels..."
             rows={3}
-            className="border border-line px-3 py-2 text-sm max-w-[72ch]"
+            className="text-sm"
           />
           <button
             type="submit"
             disabled={loading || !question.trim() || !ticker.trim()}
-            className="self-start bg-ink text-bg px-5 py-2 text-sm font-semibold hover:bg-ink-dim disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed"
+            className="self-start bg-accent text-bg px-6 py-2.5 text-sm font-bold rounded-md transition-all hover:brightness-110 hover:-translate-y-px disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed disabled:translate-y-0 disabled:brightness-100"
           >
             {loading ? 'Asking…' : 'Ask'}
           </button>

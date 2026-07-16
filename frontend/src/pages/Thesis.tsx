@@ -28,7 +28,7 @@ export default function Thesis() {
   return (
     <div className="flex flex-col gap-8">
       <form onSubmit={handleFetch} className="flex flex-col gap-2">
-        <label className="text-xs uppercase tracking-kicker text-ink-faint">Company Ticker</label>
+        <label className="text-xs uppercase tracking-kicker text-accent-dim font-mono">Company Ticker</label>
         <div className="flex gap-3">
           <input
             type="text"
@@ -36,12 +36,12 @@ export default function Thesis() {
             onChange={(e) => setTicker(e.target.value.toUpperCase())}
             placeholder="AAPL, MSFT, TSLA, ..."
             maxLength={5}
-            className="border border-line px-3 py-2 text-sm font-mono w-48"
+            className="text-sm font-mono w-48"
           />
           <button
             type="submit"
             disabled={loading || !ticker.trim()}
-            className="bg-ink text-bg px-5 py-2 text-sm font-semibold hover:bg-ink-dim disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed"
+            className="bg-accent text-bg px-6 py-2.5 text-sm font-bold rounded-md transition-all hover:brightness-110 hover:-translate-y-px disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed disabled:translate-y-0 disabled:brightness-100"
           >
             {loading ? 'Building… (takes a few minutes)' : 'Build Thesis'}
           </button>
@@ -61,7 +61,7 @@ export default function Thesis() {
       {data && (
         <div className="flex flex-col gap-10">
           <article className="border-t border-line pt-6">
-            <p className="text-xs uppercase tracking-kicker text-ink-faint mb-4">
+            <p className="text-xs uppercase tracking-kicker text-accent-dim font-mono mb-4">
               Briefing — {data.ticker}
             </p>
             <div className="text-sm leading-relaxed whitespace-pre-wrap text-ink max-w-[72ch]">
@@ -70,12 +70,16 @@ export default function Thesis() {
           </article>
 
           <div className="border-t border-line pt-6">
-            <p className="text-xs uppercase tracking-kicker text-ink-faint mb-5">
+            <p className="text-xs uppercase tracking-kicker text-accent-dim font-mono mb-5">
               Underlying evidence
             </p>
             <div className="flex flex-col gap-8">
-              {data.sections.map((section) => (
-                <details key={section.topic} className="border-l border-line pl-4">
+              {data.sections.map((section, i) => (
+                <details
+                  key={section.topic}
+                  className="animate-item border-l border-line pl-4"
+                  style={{ animationDelay: `${i * 70}ms` }}
+                >
                   <summary className="cursor-pointer text-sm font-medium text-ink hover:text-ink-dim">
                     {section.topic.replace(/_/g, ' ')}{' '}
                     <span className="font-mono text-xs text-ink-faint">

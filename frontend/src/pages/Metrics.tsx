@@ -43,9 +43,9 @@ export default function Metrics() {
           { label: 'Success Rate', value: `${stats.successRate}%` },
           { label: 'Avg Latency', value: `${stats.avgLatency}ms` },
           { label: 'Unique Tickers', value: stats.uniqueTickers },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-bg p-4">
-            <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">{stat.label}</p>
+        ].map((stat, i) => (
+          <div key={stat.label} className="animate-item bg-bg p-4" style={{ animationDelay: `${i * 70}ms` }}>
+            <p className="text-xs uppercase tracking-kicker text-accent-dim font-mono mb-2">{stat.label}</p>
             <p className="text-2xl font-semibold tracking-tightest text-ink font-mono">{stat.value}</p>
           </div>
         ))}
@@ -78,7 +78,7 @@ export default function Metrics() {
               {entries.slice(0, 20).map((entry, i) => {
                 const status = entry.error ? 'error' : entry.refused ? 'refused' : 'ok'
                 return (
-                  <tr key={i} className="hover:bg-surface transition-colors">
+                  <tr key={i} className="animate-item hover:bg-surface transition-colors" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
                     <td className="px-0 py-3 text-xs font-mono text-ink-dim">
                       {new Date(entry.timestamp).toLocaleString()}
                     </td>

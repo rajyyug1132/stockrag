@@ -4,7 +4,7 @@ import tempfile
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 
 from stockrag.api.docs import DOCS_HTML
 from stockrag.config import settings
@@ -18,7 +18,7 @@ from stockrag.api.schemas import (
 )
 from stockrag.factor_engine.report import FactorReport, build_factor_report
 from stockrag.ingestion.pipeline import ingest_pdf, ingest_ticker
-from stockrag.rag.answer import ask as rag_ask
+from stockrag.rag.answer import AnswerResult, ask as rag_ask, ask_stream as rag_ask_stream
 from stockrag.rag.metrics import metrics_path
 from stockrag.rag.thesis import build_thesis
 
@@ -125,6 +125,28 @@ def get_thesis(ticker: str, llm: str | None = None) -> ThesisResponse:
         ],
         prompt_version=result.prompt_version,
     )
+
+
+@app.post("/ask/stream")
+def ask_stream_endpoint(request: AskRequest) -> StreamingResponse:
+    """SSE stream: {"token": str} events as the answer generates, then one
+    {"done": true, answer, sources, prompt_version} event with the validated
+    final answer (citation gate applied) that the client must render instead."""
+
+    def gen():
+        for item in rag_ask_stream(request.question, request.ticker, llm_provider=request.llm):
+            if isinstance(item, AnswerResult):
+                payload = {
+                    "done": True,
+                    "answer": item.answer,
+                    "sources": [s.__dict__ for s in item.sources],
+                    "prompt_version": item.prompt_version,
+                }
+                yield f"data: {json.dumps(payload)}\n\n"
+            else:
+                yield f"data: {json.dumps({'token': item})}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
 @app.post("/ask")
