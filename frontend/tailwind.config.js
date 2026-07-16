@@ -5,20 +5,23 @@ export default {
       // Two-tone warm system: espresso surfaces, cream ink. One family (Inter),
       // hierarchy carried by size/weight/tracking, hairlines over shadows.
       colors: {
-        bg: "#30231E",          // espresso body
-        surface: "#3A2B25",     // raised panels/rows
-        sunken: "#251B17",      // code blocks, wells
-        ink: "#F5EFDF",         // cream text (~12:1 on bg)
-        "ink-dim": "#C9BBAA",   // secondary text (~7:1 on bg)
-        "ink-faint": "#A5947F", // tertiary/labels (~4.6:1 on bg)
-        line: "#4B3E39",        // hairline borders
-        ok: "#A8C9A0",
-        warn: "#D9C08A",
-        err: "#DB9C8B",
+        bg: "#0A0D0C",          // near-black, faint cool/teal cast
+        surface: "#121614",     // glass cards / raised panels
+        sunken: "#0D100F",      // inputs, wells
+        ink: "#E8EDEB",         // near-white text (~14:1 on bg)
+        "ink-dim": "#9AA6A2",   // secondary text (~7:1 on bg)
+        "ink-faint": "#69736F", // tertiary/labels/placeholders
+        line: "#1E2825",        // hairline borders
+        accent: "#34E5A0",      // mint — primary actions
+        "accent-dim": "#4ADEA0",// mint for kickers/nav on dark
+        ok: "#34E5A0",
+        warn: "#E5C97A",
+        err: "#FF6B6B",
       },
       fontFamily: {
-        sans: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-        mono: "ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, monospace",
+        sans: "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
+        serif: "'Newsreader', Georgia, 'Times New Roman', serif",
+        mono: "'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace",
       },
       fontSize: {
         xs: ["12px", "16px"],

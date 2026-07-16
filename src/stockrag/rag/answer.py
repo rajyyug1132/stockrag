@@ -150,3 +150,92 @@ def ask(
         metric.update(error=type(exc).__name__, total_ms=round((time.perf_counter() - started) * 1000))
         record_request(metric)
         raise
+
+
+def ask_stream(
+    question: str,
+    ticker: str,
+    prompt_version: str = "v3",
+    retriever: BaseRetriever | None = None,
+    llm_provider: str | None = None,
+):
+    """Like ask(), but yields answer tokens (str) as they arrive, then a final
+    AnswerResult. The final result applies the same think-strip + citation gate
+    as ask(), so the client must replace streamed text with the final answer.
+    Tokens inside a leading <think> block are held back, never streamed."""
+    provider = llm_provider or settings.llm_provider
+    model = {
+        "gemini": settings.gemini_model,
+        "nvidia": settings.nvidia_model,
+        "ollama": settings.ollama_model,
+    }.get(provider, settings.ollama_model)
+    config = {
+        "callbacks": tracing_callbacks(),
+        "run_name": "stockrag-ask-stream",
+        "metadata": {"ticker": ticker.upper(), "prompt_version": prompt_version, "llm": provider},
+    }
+    metric: dict = {"ticker": ticker.upper(), "llm": provider, "model": model, "prompt_version": prompt_version}
+
+    started = time.perf_counter()
+    try:
+        retriever = retriever or get_retriever(ticker)
+        docs = retriever.invoke(question, config=config)
+        metric["retrieval_ms"] = round((time.perf_counter() - started) * 1000)
+
+        if not docs:
+            metric.update(refused=True, total_ms=metric["retrieval_ms"])
+            record_request(metric)
+            yield AnswerResult(
+                answer=NO_CONTEXT_MESSAGE, sources=[], prompt_version=prompt_version, contexts=[]
+            )
+            return
+
+        docs = expand_docs(docs, ticker, window=settings.parent_window)
+        context, sources = _format_docs(docs)
+        chain = load_prompt(prompt_version) | get_llm(llm_provider)
+        llm_started = time.perf_counter()
+
+        buffer = ""
+        emitted = 0
+        thinking: bool | None = None  # unknown until first non-space content
+        for chunk in chain.stream({"question": question, "context": context}, config=config):
+            buffer += str(chunk.content)
+            if thinking is None and buffer.lstrip():
+                thinking = buffer.lstrip().startswith("<think")
+            if thinking:
+                if "</think>" in buffer:
+                    buffer = THINK_BLOCK_RE.sub("", buffer)
+                    thinking = False
+                    emitted = 0
+                else:
+                    continue
+            if len(buffer) > emitted:
+                yield buffer[emitted:]
+                emitted = len(buffer)
+        metric["llm_ms"] = round((time.perf_counter() - llm_started) * 1000)
+
+        answer = buffer.strip()
+        if not CITATION_RE.search(answer):
+            answer = NO_CONTEXT_MESSAGE
+
+        # ponytail: streaming chunks don't carry usage_metadata reliably; token
+        # counts/cost stay unrecorded for streamed asks — add aggregation if
+        # metrics need them.
+        metric.update(
+            total_ms=round((time.perf_counter() - started) * 1000),
+            citation_coverage=citation_coverage(answer),
+            refused=answer == NO_CONTEXT_MESSAGE,
+            n_sources=len(sources),
+        )
+        record_request(metric)
+
+        yield AnswerResult(
+            answer=answer,
+            sources=sources,
+            prompt_version=prompt_version,
+            contexts=[doc.page_content for doc in docs],
+        )
+    except Exception as exc:
+        metric.update(error=type(exc).__name__, total_ms=round((time.perf_counter() - started) * 1000))
+        record_request(metric)
+        raise
