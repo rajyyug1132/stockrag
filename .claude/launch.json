@@ -4,7 +4,7 @@
     {
       "name": "stockrag-api",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "uvicorn", "stockrag.api.main:app", "--app-dir", "src", "--port", "8000", "--env-file", "../../../.env"],
+      "runtimeArgs": ["run", "uvicorn", "stockrag.api.main:app", "--app-dir", "src", "--port", "8000", "--env-file", ".env"],
       "port": 8000
     },
     {

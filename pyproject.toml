@@ -31,6 +31,10 @@ dependencies = [
     "langchain-huggingface~=0.1",
     "langchain-ollama~=0.2",
     "langchain-google-genai~=2.0",
+    # NIM is the default provider and rag/llm.py reaches for ChatOpenAI; without
+    # this it only resolved as a ragas (dev-group) transitive, so --no-dev
+    # installs (Docker, HF Space) broke on the default path.
+    "langchain-openai~=0.3",
     "torch~=2.5",
     "langfuse>=4.13.0",
     "pypdf~=5.1",

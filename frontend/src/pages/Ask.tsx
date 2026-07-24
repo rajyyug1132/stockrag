@@ -17,6 +17,9 @@ export default function Ask() {
   const [ingesting, setIngesting] = useState(false)
   const [ingestStatus, setIngestStatus] = useState('')
   const [ingestToken, setIngestToken] = useState('')
+  // '' = whatever the server has configured (LLM_PROVIDER); the API takes a
+  // per-request override, so the UI can switch providers without a restart.
+  const [llm, setLlm] = useState('')
 
   const handleIngest = async () => {
     if (!ticker.trim()) return
@@ -44,7 +47,7 @@ export default function Ask() {
     setError('')
 
     try {
-      const response = await ask(question, ticker)
+      const response = await ask(question, ticker, llm || undefined)
       setMessages((prev) => [
         ...prev,
         { role: 'user', content: question },
@@ -138,13 +141,29 @@ export default function Ask() {
             rows={3}
             className="border border-line px-3 py-2 text-sm max-w-[72ch]"
           />
-          <button
-            type="submit"
-            disabled={loading || !question.trim() || !ticker.trim()}
-            className="self-start bg-ink text-bg px-5 py-2 text-sm font-semibold hover:bg-ink-dim disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed"
-          >
-            {loading ? 'Asking…' : 'Ask'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={loading || !question.trim() || !ticker.trim()}
+              className="bg-ink text-bg px-5 py-2 text-sm font-semibold hover:bg-ink-dim disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed"
+            >
+              {loading ? 'Asking…' : 'Ask'}
+            </button>
+            <select
+              value={llm}
+              onChange={(e) => setLlm(e.target.value)}
+              aria-label="Generation model"
+              className="border border-line bg-bg text-ink-dim px-3 py-2 text-xs"
+            >
+              <option value="">server default</option>
+              <option value="nvidia">NVIDIA NIM</option>
+              <option value="gemini">Gemini</option>
+              <option value="ollama">Ollama (local)</option>
+            </select>
+            <span className="text-xs text-ink-faint">
+              Retrieval always runs locally; only generation switches.
+            </span>
+          </div>
         </form>
       </div>
     </div>

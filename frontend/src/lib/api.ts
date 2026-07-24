@@ -2,13 +2,29 @@
 // set VITE_API_URL to the deployed API origin (e.g. the HF Space URL).
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api'
 
+// Field names mirror stockrag.factor_engine.report.FactorReport exactly —
+// ratios come back as fractions (roe 1.52 = 152%), not percentages.
 export interface FactorReport {
   ticker: string
-  roe_pct: number | null
-  net_margin_pct: number | null
-  pe_ratio: number | null
-  piotroski_score: number | null
+  cik: number
+  fiscal_year_end: string | null
+  price: number | null
+  market_cap: number | null
   beta: number | null
+  revenue: number | null
+  revenue_growth: number | null
+  net_margin: number | null
+  roe: number | null
+  eps: number | null
+  pe_ratio: number | null
+  free_cash_flow: number | null
+  p_fcf_ratio: number | null
+  piotroski_score: number | null
+  piotroski_signals: Record<string, boolean | null>
+  gross_profitability: number | null
+  book_to_market: number | null
+  momentum_12_1: number | null
+  checks: Record<string, boolean | null>
   missing: string[]
 }
 

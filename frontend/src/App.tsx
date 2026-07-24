@@ -13,6 +13,18 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-bg">
       <Header activeView={view} onViewChange={setView} />
+      <div className="border-b border-line">
+        <div className="max-w-6xl mx-auto px-4 py-3 md:px-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint">
+          {['SEC EDGAR', 'section-aware chunking', 'BM25 + vector (RRF)', 'cross-encoder rerank', 'cited answer'].map(
+            (step, i) => (
+              <span key={step} className="flex items-center gap-3">
+                {i > 0 && <span aria-hidden="true">→</span>}
+                <span className="uppercase tracking-kicker">{step}</span>
+              </span>
+            )
+          )}
+        </div>
+      </div>
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8 md:px-6 md:py-10">
         {view === 'ask' && <Ask />}
         {view === 'thesis' && <Thesis />}
