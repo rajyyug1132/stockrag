@@ -16,6 +16,8 @@ pinned: false
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
+![StockRAG answering a question about Apple's SEC filings with numbered citations](docs/ask.png)
+
 Ask a chatbot for Apple's Piotroski F-Score and you get a confident number
 with no provenance. Ask it what the EU said about Irish state aid and you get
 a summary of what it remembers reading in 2023.
@@ -91,6 +93,8 @@ UNDERLYING EVIDENCE
 Those percentages are the point. The briefing tells you which of its own
 sections are well supported by the filing and which are thin, instead of
 presenting all four with equal confidence.
+
+![Thesis briefing for AAPL: summary, bull case and bear case, each point cited back to the filing](docs/thesis.png)
 
 ## Architecture
 
@@ -214,9 +218,11 @@ ephemeral. Ingest a ticker once after boot (`POST /ingest/AAPL`, or the button
 in either UI) and it stays indexed until the Space sleeps. Set `INGEST_TOKEN`
 on the Space if you'd rather strangers not spend your EDGAR quota.
 
-Example factor report (AAPL, FY ending 2025-09-27): ROE 151.9%, net margin
-26.9%, revenue $416.2B, free cash flow $98.8B, beta 1.06, Piotroski F-Score
-8/9 (the failing signal: operating cash flow below net income).
+![Factor report for AAPL: Piotroski 8/9, the nine accounting signals, and the metric table](docs/factors.png)
+
+Every number there came from XBRL or yfinance. The one failing F-Score signal
+is operating cash flow below net income, and the report says so rather than
+rounding 8/9 up to a clean story.
 
 ## Observability
 
