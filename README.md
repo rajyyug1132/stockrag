@@ -65,6 +65,33 @@ Every date and dollar figure above came out of the retrieved chunk. Ask
 something the filing doesn't cover and you get the refusal instead, which the
 eval suite scores as a metric in its own right.
 
+The **Thesis** view goes a step further: it runs three fixed questions through
+the same pipeline, joins the results to the XBRL factor report, and reports
+how much of each section was actually grounded.
+
+```
+BRIEFING — AAPL
+
+Bull case
+- Capital allocation: returned $104.7B to shareholders in 2025 via $89.3B in
+  buybacks and $15.4B in dividends, with a new $100B repurchase program [1]
+- Piotroski 8/9: improving ROA, gross margin and asset turnover
+
+Bear case
+- High valuation: P/FCF 49.8, P/E 43.9
+- Intense competition: aggressive pricing and rapid innovation from rivals in
+  stagnant markets, pressuring gross margins [1][2]
+
+UNDERLYING EVIDENCE
+  risks               69% grounded
+  competition        100% grounded
+  capital allocation  71% grounded
+```
+
+Those percentages are the point. The briefing tells you which of its own
+sections are well supported by the filing and which are thin, instead of
+presenting all four with equal confidence.
+
 ## Architecture
 
 ```mermaid
