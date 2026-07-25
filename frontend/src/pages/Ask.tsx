@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ask, ingest } from '../lib/api'
 import type { Source } from '../lib/api'
+import { Markdown } from '../components/Markdown'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -105,9 +106,13 @@ export default function Ask() {
                 <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">
                   {msg.role === 'user' ? 'You' : 'StockRAG'}
                 </p>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink max-w-[72ch]">
-                  {msg.content}
-                </p>
+                {msg.role === 'user' ? (
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink max-w-[72ch]">
+                    {msg.content}
+                  </p>
+                ) : (
+                  <Markdown text={msg.content} />
+                )}
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-line">
                     <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">Sources</p>

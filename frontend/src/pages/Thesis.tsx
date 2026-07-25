@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getThesis, type ThesisResponse } from '../lib/api'
+import { Markdown } from '../components/Markdown'
 
 export default function Thesis() {
   const [ticker, setTicker] = useState('')
@@ -64,9 +65,7 @@ export default function Thesis() {
             <p className="text-xs uppercase tracking-kicker text-ink-faint mb-4">
               Briefing — {data.ticker}
             </p>
-            <div className="text-sm leading-relaxed whitespace-pre-wrap text-ink max-w-[72ch]">
-              {data.synthesis}
-            </div>
+            <Markdown text={data.synthesis} />
           </article>
 
           <div className="border-t border-line pt-6">
@@ -84,9 +83,7 @@ export default function Thesis() {
                   </summary>
                   <div className="mt-3">
                     <p className="text-xs text-ink-faint mb-2">{section.question}</p>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink-dim max-w-[72ch]">
-                      {section.answer}
-                    </p>
+                    <Markdown text={section.answer} dim />
                     {section.sources.length > 0 && (
                       <ul className="mt-3 space-y-1">
                         {section.sources.map((src) => (
