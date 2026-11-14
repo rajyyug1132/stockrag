@@ -15,9 +15,10 @@ body {
   @apply font-sans;
 }
 
-h1, h2, h3 { @apply font-sans font-semibold tracking-tightest; }
-h1 { @apply text-3xl leading-tight; }
-h2 { @apply text-xl leading-snug; }
+/* Serif display headings (Newsreader) over mono/sans UI — PageCoder cadence. */
+h1, h2, h3 { @apply font-serif font-medium tracking-tight; }
+h1 { @apply text-4xl leading-tight; }
+h2 { @apply text-2xl leading-snug; }
 h3 { @apply text-lg; }
 
 code, pre {
@@ -31,13 +32,14 @@ pre {
 }
 
 input, textarea, select {
-  @apply bg-sunken text-ink;
+  @apply bg-sunken text-ink border border-line rounded-md;
+  padding: 12px 16px;
 }
 input::placeholder, textarea::placeholder {
-  @apply text-ink-faint;
+  @apply text-ink-dim;
 }
 input:focus, textarea:focus, select:focus {
-  @apply outline-none ring-1 ring-ink border-ink;
+  @apply outline-none border-accent ring-2 ring-accent/30;
 }
 
 button {
@@ -55,6 +57,21 @@ th {
 td {
   @apply border-b border-line px-2 py-2 text-sm;
 }
+
+/* Fluid transitions (killed under prefers-reduced-motion below). */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+/* Remounts on view switch (key={view}) so it replays each tab change. */
+.animate-view { animation: fade-in-up 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+.animate-item { animation: fade-in-up 0.35s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+.hover-lift   { @apply transition-transform duration-200; }
+.hover-lift:hover { transform: translateY(-2px); }
 
 @media (max-width: 640px) {
   html { font-size: 13px; }

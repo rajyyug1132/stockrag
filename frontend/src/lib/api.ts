@@ -75,6 +75,43 @@ export async function ask(question: string, ticker: string, llm?: string): Promi
   return res.json()
 }
 
+// SSE over fetch (EventSource can't POST a body). Calls onToken per token,
+// resolves with the server's validated final answer — render that, not the
+// accumulated tokens (backend may replace uncited answers with a refusal).
+export async function askStream(
+  question: string,
+  ticker: string,
+  onToken: (token: string) => void,
+  llm?: string,
+): Promise<AskResponse> {
+  const res = await fetch(`${BASE_URL}/ask/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, ticker, llm }),
+  })
+  if (!res.ok || !res.body) throw new Error(`${res.status}: ${res.statusText}`)
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  let final: AskResponse | null = null
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const events = buf.split('\n\n')
+    buf = events.pop() ?? ''
+    for (const evt of events) {
+      if (!evt.startsWith('data: ')) continue
+      const data = JSON.parse(evt.slice(6))
+      if (data.done) final = data
+      else if (data.token) onToken(data.token)
+    }
+  }
+  if (!final) throw new Error('Stream ended without a final answer')
+  return final
+}
+
 export interface ThesisSection {
   topic: string
   question: string

@@ -83,7 +83,7 @@ export default function Factors() {
   return (
     <div className="flex flex-col gap-8">
       <form onSubmit={handleFetch} className="flex flex-col gap-2">
-        <label className="text-xs uppercase tracking-kicker text-ink-faint">Company Ticker</label>
+        <label className="text-xs uppercase tracking-kicker text-accent-dim font-mono">Company Ticker</label>
         <div className="flex gap-3">
           <input
             type="text"
@@ -91,12 +91,12 @@ export default function Factors() {
             onChange={(e) => setTicker(e.target.value.toUpperCase())}
             placeholder="AAPL, MSFT, TSLA, ..."
             maxLength={5}
-            className="border border-line px-3 py-2 text-sm font-mono w-48"
+            className="text-sm font-mono w-48"
           />
           <button
             type="submit"
             disabled={loading || !ticker.trim()}
-            className="bg-ink text-bg px-5 py-2 text-sm font-semibold hover:bg-ink-dim disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed"
+            className="bg-accent text-bg px-6 py-2.5 text-sm font-bold rounded-md transition-all hover:brightness-110 hover:-translate-y-px disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed disabled:translate-y-0 disabled:brightness-100"
           >
             {loading ? 'Loading…' : 'Get Factors'}
           </button>
@@ -112,16 +112,16 @@ export default function Factors() {
       {data && (
         <div className="border-t border-line">
           <div className="grid gap-4 py-6 sm:grid-cols-3">
-            <div className="border border-line p-4">
-              <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">Piotroski F-Score</p>
+            <div className="border border-line bg-surface p-4 rounded-xl hover-lift">
+              <p className="text-xs uppercase tracking-kicker text-accent-dim font-mono mb-2">Piotroski F-Score</p>
               <p className="font-mono text-3xl text-ink">
                 {data.piotroski_score ?? '—'}
                 <span className="text-ink-faint text-lg">/9</span>
               </p>
               <p className="text-xs text-ink-faint mt-1">9 accounting signals (Piotroski, 2000)</p>
             </div>
-            <div className="sm:col-span-2 border border-line p-4">
-              <p className="text-xs uppercase tracking-kicker text-ink-faint mb-3">Flowchart checks</p>
+            <div className="sm:col-span-2 border border-line bg-surface p-4 rounded-xl hover-lift">
+              <p className="text-xs uppercase tracking-kicker text-accent-dim font-mono mb-3">Flowchart checks</p>
               <ul className="space-y-1.5">
                 {Object.entries(data.checks).map(([key, passed]) => (
                   <li key={key} className="text-sm text-ink-dim flex gap-2">
@@ -134,7 +134,7 @@ export default function Factors() {
           </div>
 
           <div className="pb-6">
-            <p className="text-xs uppercase tracking-kicker text-ink-faint mb-3">F-Score signals</p>
+            <p className="text-xs uppercase tracking-kicker text-accent-dim font-mono mb-3">F-Score signals</p>
             <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
               {Object.entries(data.piotroski_signals).map(([key, passed]) => (
                 <li key={key} className="text-xs text-ink-dim flex gap-2">
@@ -154,8 +154,12 @@ export default function Factors() {
               </tr>
             </thead>
             <tbody className="text-sm">
-              {rows.map((row) => (
-                <tr key={row.label} className="hover:bg-surface transition-colors">
+              {rows.map((row, i) => (
+                <tr
+                  key={row.label}
+                  className="animate-item hover:bg-surface transition-colors"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
                   <td className="px-0 py-3 font-medium text-ink">{row.label}</td>
                   <td className="px-3 py-3 text-right font-mono text-lg text-ink">{row.value}</td>
                   <td className="px-3 py-3 text-ink-faint">{row.note}</td>
