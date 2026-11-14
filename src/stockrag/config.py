@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     # server's IP. Empty (default) leaves it open for local dev.
     ingest_token: str = ""
 
+    # Comma-separated tickers (e.g. "AAPL,MSFT") ingested in a background thread
+    # at API startup — for hosts with an ephemeral disk. Empty (default) = off.
+    auto_ingest_tickers: str = ""
+
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.filings_dir, self.facts_dir, self.chroma_dir):
             d.mkdir(parents=True, exist_ok=True)

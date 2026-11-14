@@ -1,6 +1,9 @@
 import json
+import logging
 import os
 import tempfile
+import threading
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,7 +25,54 @@ from stockrag.rag.answer import AnswerResult, ask as rag_ask, ask_stream as rag_
 from stockrag.rag.metrics import metrics_path
 from stockrag.rag.thesis import build_thesis
 
-app = FastAPI(title="StockRAG", docs_url=None)
+# uvicorn only attaches handlers to its own loggers, so a module logger's INFO
+# lines would never reach the server log (e.g. the Space's boot log).
+logger = logging.getLogger("uvicorn.error")
+
+# Set by the lifespan when AUTO_INGEST_TICKERS is non-empty; tests can join it.
+auto_ingest_thread: threading.Thread | None = None
+
+
+def _parse_tickers(raw: str) -> list[str]:
+    """Comma-separated tickers -> stripped, upper-cased, de-duplicated, order kept."""
+    seen: dict[str, None] = {}
+    for part in raw.split(","):
+        ticker = part.strip().upper()
+        if ticker:
+            seen.setdefault(ticker)
+    return list(seen)
+
+
+def _auto_ingest(tickers: list[str]) -> None:
+    for ticker in tickers:
+        logger.info("auto-ingest: starting %s", ticker)
+        try:
+            result = ingest_ticker(ticker)
+        except Exception:
+            logger.exception("auto-ingest: %s failed", ticker)
+            continue
+        logger.info(
+            "auto-ingest: finished %s (filings_ingested=%d, chunks_added=%d)",
+            ticker,
+            result.filings_ingested,
+            result.chunks_added,
+        )
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    global auto_ingest_thread
+    auto_ingest_thread = None
+    tickers = _parse_tickers(settings.auto_ingest_tickers)
+    if tickers:
+        auto_ingest_thread = threading.Thread(
+            target=_auto_ingest, args=(tickers,), name="auto-ingest", daemon=True
+        )
+        auto_ingest_thread.start()
+    yield
+
+
+app = FastAPI(title="StockRAG", docs_url=None, lifespan=lifespan)
 
 # Frontend is deployed on a different origin (Vercel) than the API (HF Spaces).
 app.add_middleware(
