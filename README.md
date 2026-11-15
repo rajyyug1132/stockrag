@@ -232,7 +232,7 @@ ephemeral. Ingest a ticker once after boot (`POST /ingest/AAPL`, or the button
 in either UI) and it stays indexed until the Space sleeps. Set `INGEST_TOKEN`
 on the Space if you'd rather strangers not spend your EDGAR quota.
 
-![Factor report for AAPL: Piotroski 8/9, the nine accounting signals, and the metric table](docs/factors.png)
+![Factor report for AAPL: Piotroski F-Score ring at 9/9, the nine accounting signals, and the metric table](docs/factors.png)
 
 Every number there came from XBRL or yfinance. The one failing F-Score signal
 is operating cash flow below net income, and the report says so rather than
