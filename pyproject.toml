@@ -49,6 +49,7 @@ dev = [
     "pytest~=8.3",
     "ruff~=0.8",
     "ragas~=0.2",
+    "pgserver>=0.1.4",
 ]
 
 [[tool.uv.index]]
