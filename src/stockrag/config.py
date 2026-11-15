@@ -22,7 +22,21 @@ class Settings(BaseSettings):
     chroma_dir: Path = PROJECT_ROOT / "data" / "chroma"
     prompts_dir: Path = PROJECT_ROOT / "prompts"
 
+    # Retrieval backend: "chroma" (local disk + in-process BM25, the default
+    # for dev, Ollama and CI) or "supabase" (pgvector + Postgres full-text,
+    # for the serverless API). The service key is server-side only.
+    vector_store: str = "chroma"
+    supabase_url: str = ""
+    supabase_service_key: str = ""
+
+    # Embeddings: "local" (bge below, on CPU) or "nvidia" (hosted NIM). Vectors
+    # from the two are not interchangeable: an index built with one must be
+    # queried with the same one.
+    embedding_provider: str = "local"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
+    # Provisional until scripts/probe_nim_embed.py confirms it for this account.
+    nvidia_embed_model: str = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+    nvidia_embed_url: str = "https://integrate.api.nvidia.com/v1/embeddings"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     # "local" (cross-encoder above) or "nvidia" (hosted NIM reranker, uses
     # NVIDIA_API_KEY; falls back to local on any error). Default stays local

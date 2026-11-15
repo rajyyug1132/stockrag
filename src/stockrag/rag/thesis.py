@@ -17,7 +17,7 @@ from stockrag.factor_engine.report import FactorReport, build_factor_report
 from stockrag.rag.answer import AnswerResult, Source, ask
 from stockrag.rag.llm import get_llm
 from stockrag.rag.metrics import citation_coverage, record_request
-from stockrag.rag.store import get_vector_store
+from stockrag.rag.store import get_store
 
 PROMPT_VERSION = "thesis_v1"
 
@@ -49,11 +49,8 @@ class ThesisResult:
 
 
 def _corpus_fingerprint(ticker: str) -> str:
-    """Hash of the ticker's ingested accessions — cache validity key.
-    # ponytail: pulls all chunk metadatas for the ticker; paginate if a
-    # ticker ever holds >100k chunks."""
-    got = get_vector_store()._collection.get(where={"ticker": ticker}, include=["metadatas"])
-    accessions = sorted({m["accession"] for m in got["metadatas"]})
+    """Hash of the ticker's ingested accessions — cache validity key."""
+    accessions = get_store().ticker_accessions(ticker)
     return hashlib.sha256("|".join(accessions).encode()).hexdigest()[:16]
 
 
