@@ -59,22 +59,6 @@ export interface MetricsEntry {
   n_sources?: number
 }
 
-export async function getFactors(ticker: string): Promise<FactorReport> {
-  const res = await fetch(`${BASE_URL}/factors/${encodeURIComponent(ticker)}`)
-  if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
-  return res.json()
-}
-
-export async function ask(question: string, ticker: string, llm?: string): Promise<AskResponse> {
-  const res = await fetch(`${BASE_URL}/ask`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question, ticker, llm }),
-  })
-  if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
-  return res.json()
-}
-
 export interface ThesisSection {
   topic: string
   question: string
@@ -90,12 +74,6 @@ export interface ThesisResponse {
   prompt_version: string
 }
 
-export async function getThesis(ticker: string): Promise<ThesisResponse> {
-  const res = await fetch(`${BASE_URL}/thesis/${encodeURIComponent(ticker)}`)
-  if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
-  return res.json()
-}
-
 export interface IngestResponse {
   ticker: string
   filings_ingested: number
@@ -103,23 +81,94 @@ export interface IngestResponse {
   chunks_added: number
 }
 
-export async function ingest(ticker: string, token?: string): Promise<IngestResponse> {
-  const res = await fetch(`${BASE_URL}/ingest/${encodeURIComponent(ticker)}`, {
+/** Error carrying the HTTP status, so callers can react to e.g. 403. */
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+const UNREACHABLE = "Can't reach the API. Check that the server is running, then try again."
+
+/** FastAPI returns {"detail": "..."} on 4xx; validation errors return a list. */
+async function readDetail(res: Response): Promise<string | null> {
+  try {
+    const body = await res.json()
+    const detail = body?.detail
+    if (typeof detail === 'string') return detail
+    if (Array.isArray(detail) && detail.length > 0) {
+      const first = detail[0]
+      if (typeof first?.msg === 'string') return first.msg
+    }
+  } catch {
+    // body was not JSON
+  }
+  return null
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, init)
+  } catch {
+    throw new ApiError(UNREACHABLE, 0)
+  }
+  if (!res.ok) {
+    const detail = await readDetail(res)
+    let message: string
+    if (detail) message = detail
+    else if (res.status >= 500) message = `The server hit an error (${res.status}). Try again in a moment.`
+    else message = `The request failed (${res.status} ${res.statusText}).`
+    throw new ApiError(message, res.status)
+  }
+  try {
+    return (await res.json()) as T
+  } catch {
+    throw new ApiError('The server sent a response the app could not read.', res.status)
+  }
+}
+
+export async function getFactors(ticker: string): Promise<FactorReport> {
+  return request<FactorReport>(`/factors/${encodeURIComponent(ticker)}`)
+}
+
+export async function ask(question: string, ticker: string, llm?: string): Promise<AskResponse> {
+  return request<AskResponse>('/ask', {
     method: 'POST',
-    headers: token ? { 'X-Ingest-Token': token } : {},
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, ticker, llm }),
   })
-  if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
-  return res.json()
+}
+
+export async function getThesis(ticker: string, llm?: string): Promise<ThesisResponse> {
+  const query = llm ? `?llm=${encodeURIComponent(llm)}` : ''
+  return request<ThesisResponse>(`/thesis/${encodeURIComponent(ticker)}${query}`)
+}
+
+export async function ingest(ticker: string, token?: string): Promise<IngestResponse> {
+  try {
+    return await request<IngestResponse>(`/ingest/${encodeURIComponent(ticker)}`, {
+      method: 'POST',
+      headers: token ? { 'X-Ingest-Token': token } : {},
+    })
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 403) {
+      throw new ApiError(
+        token
+          ? 'The server rejected the ingest token. Check it under "Ingest token" and try again.'
+          : 'This server requires an ingest token. Enter it under "Ingest token" and try again.',
+        403,
+      )
+    }
+    throw err
+  }
 }
 
 export async function getMetrics(): Promise<MetricsEntry[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/metrics`)
-    if (!res.ok) return []
-    return res.json()
-  } catch {
-    return []
-  }
+  return request<MetricsEntry[]>('/metrics')
 }
 
 export async function getHealth(): Promise<boolean> {
