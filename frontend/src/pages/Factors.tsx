@@ -1,5 +1,13 @@
 import { useState } from 'react'
+import { AnimatePresence, motion, type Variants } from 'motion/react'
 import { getFactors, type FactorReport } from '../lib/api'
+import { fadeUp, Pending, ScoreRing, stagger } from '../components/motion'
+import TickerForm from '../components/TickerForm'
+
+const mark: Variants = {
+  hidden: { opacity: 0, scale: 0.4 },
+  visible: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 500, damping: 25 } },
+}
 
 export default function Factors() {
   const [ticker, setTicker] = useState('')
@@ -7,10 +15,7 @@ export default function Factors() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleFetch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!ticker.trim()) return
-
+  const handleFetch = async () => {
     setLoading(true)
     setError('')
     setData(null)
@@ -82,70 +87,73 @@ export default function Factors() {
 
   return (
     <div className="flex flex-col gap-8">
-      <form onSubmit={handleFetch} className="flex flex-col gap-2">
-        <label className="text-xs uppercase tracking-kicker text-ink-faint">Company Ticker</label>
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value.toUpperCase())}
-            placeholder="AAPL, MSFT, TSLA, ..."
-            maxLength={5}
-            className="border border-line px-3 py-2 text-sm font-mono w-48"
-          />
-          <button
-            type="submit"
-            disabled={loading || !ticker.trim()}
-            className="bg-ink text-bg px-5 py-2 text-sm font-semibold hover:bg-ink-dim disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed"
-          >
-            {loading ? 'Loading…' : 'Get Factors'}
-          </button>
-        </div>
-      </form>
+      <TickerForm
+        ticker={ticker}
+        onTickerChange={setTicker}
+        onSubmit={handleFetch}
+        loading={loading}
+        submitLabel="Get Factors"
+        loadingLabel="Loading…"
+      />
 
-      {error && (
-        <div className="px-3 py-2 border border-err text-err text-sm">
-          {error}
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            key="error"
+            variants={fadeUp}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            role="alert"
+            className="px-3 py-2 border border-err text-err text-sm"
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {loading && <Pending message="Pulling XBRL company facts and market data" />}
 
       {data && (
-        <div className="border-t border-line">
-          <div className="grid gap-4 py-6 sm:grid-cols-3">
+        <motion.div variants={stagger(4, 0.3)} initial="hidden" animate="visible" className="border-t border-line">
+          <motion.div variants={fadeUp} className="grid gap-4 py-6 sm:grid-cols-3">
             <div className="border border-line p-4">
-              <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">Piotroski F-Score</p>
-              <p className="font-mono text-3xl text-ink">
-                {data.piotroski_score ?? '—'}
-                <span className="text-ink-faint text-lg">/9</span>
-              </p>
-              <p className="text-xs text-ink-faint mt-1">9 accounting signals (Piotroski, 2000)</p>
+              <p className="text-xs uppercase tracking-kicker text-ink-faint mb-3">Piotroski F-Score</p>
+              <div className="flex items-center gap-4">
+                <ScoreRing score={data.piotroski_score} />
+                <p className="text-xs text-ink-faint">
+                  out of 9 accounting signals
+                  <br />
+                  (Piotroski, 2000)
+                </p>
+              </div>
             </div>
             <div className="sm:col-span-2 border border-line p-4">
               <p className="text-xs uppercase tracking-kicker text-ink-faint mb-3">Flowchart checks</p>
-              <ul className="space-y-1.5">
+              <motion.ul variants={stagger(3)} className="space-y-1.5">
                 {Object.entries(data.checks).map(([key, passed]) => (
-                  <li key={key} className="text-sm text-ink-dim flex gap-2">
-                    <span className={passed ? 'text-ok' : 'text-err'}>{passed ? '✓' : '✗'}</span>
+                  <motion.li key={key} variants={fadeUp} className="text-sm text-ink-dim flex gap-2">
+                    <motion.span variants={mark} className={passed ? 'text-ok' : 'text-err'}>{passed ? '✓' : '✗'}</motion.span>
                     {checkLabels[key] ?? key}
-                  </li>
+                  </motion.li>
                 ))}
-              </ul>
+              </motion.ul>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="pb-6">
+          <motion.div variants={fadeUp} className="pb-6">
             <p className="text-xs uppercase tracking-kicker text-ink-faint mb-3">F-Score signals</p>
-            <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
+            <motion.ul variants={stagger(9)} className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
               {Object.entries(data.piotroski_signals).map(([key, passed]) => (
-                <li key={key} className="text-xs text-ink-dim flex gap-2">
-                  <span className={passed ? 'text-ok' : 'text-ink-faint'}>{passed ? '✓' : '✗'}</span>
+                <motion.li key={key} variants={fadeUp} className="text-xs text-ink-dim flex gap-2">
+                  <motion.span variants={mark} className={passed ? 'text-ok' : 'text-ink-faint'}>{passed ? '✓' : '✗'}</motion.span>
                   {signalLabels[key] ?? key}
-                </li>
+                </motion.li>
               ))}
-            </ul>
-          </div>
+            </motion.ul>
+          </motion.div>
 
-          <table className="w-full border-t border-line">
+          <motion.table variants={stagger(rows.length, 0.4)} className="w-full border-t border-line">
             <thead>
               <tr>
                 <th className="text-xs uppercase tracking-kicker text-ink-faint font-medium px-0 py-3 bg-transparent">Metric</th>
@@ -155,24 +163,24 @@ export default function Factors() {
             </thead>
             <tbody className="text-sm">
               {rows.map((row) => (
-                <tr key={row.label} className="hover:bg-surface transition-colors">
+                <motion.tr key={row.label} variants={fadeUp} className="hover:bg-surface transition-colors">
                   <td className="px-0 py-3 font-medium text-ink">{row.label}</td>
                   <td className="px-3 py-3 text-right font-mono text-lg text-ink">{row.value}</td>
                   <td className="px-3 py-3 text-ink-faint">{row.note}</td>
-                </tr>
+                </motion.tr>
               ))}
             </tbody>
-          </table>
+          </motion.table>
 
           {data.missing.length > 0 && (
-            <p className="py-3 text-xs text-ink-faint">
+            <motion.p variants={fadeUp} className="py-3 text-xs text-ink-faint">
               <span className="uppercase tracking-kicker">Missing data:</span> {data.missing.join(', ')}
-            </p>
+            </motion.p>
           )}
-        </div>
+        </motion.div>
       )}
 
-      {!data && !error && (
+      {!data && !error && !loading && (
         <p className="text-sm text-ink-faint py-10">
           Enter a ticker to view financial factors from SEC XBRL data.
         </p>

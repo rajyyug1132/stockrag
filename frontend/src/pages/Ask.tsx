@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { ask, ingest } from '../lib/api'
 import type { Source } from '../lib/api'
 import { Markdown } from '../components/Markdown'
+import { fade, fadeUp, Pending, stagger } from '../components/motion'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -21,6 +23,12 @@ export default function Ask() {
   // '' = whatever the server has configured (LLM_PROVIDER); the API takes a
   // per-request override, so the UI can switch providers without a restart.
   const [llm, setLlm] = useState('')
+  const threadEnd = useRef<HTMLDivElement>(null)
+
+  // Keep the newest message (or the pending row) in view.
+  useEffect(() => {
+    threadEnd.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [messages.length, loading])
 
   const handleIngest = async () => {
     if (!ticker.trim()) return
@@ -65,9 +73,10 @@ export default function Ask() {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
-        <label className="text-xs uppercase tracking-kicker text-ink-faint">Ticker</label>
+        <label htmlFor="ask-ticker" className="text-xs uppercase tracking-kicker text-ink-faint">Ticker</label>
         <div className="flex gap-3 items-center flex-wrap">
           <input
+            id="ask-ticker"
             type="text"
             value={ticker}
             onChange={(e) => setTicker(e.target.value.toUpperCase())}
@@ -75,34 +84,52 @@ export default function Ask() {
             maxLength={5}
             className="border border-line px-3 py-2 text-sm font-mono w-48"
           />
-          <button
+          <motion.button
             type="button"
+            whileTap={{ scale: 0.97 }}
             onClick={handleIngest}
             disabled={ingesting || !ticker.trim()}
             className="border border-line text-ink-dim px-4 py-2 text-sm hover:text-ink hover:border-ink-faint disabled:text-ink-faint disabled:cursor-not-allowed"
           >
-            {ingesting ? 'Ingesting… (~1 min)' : 'Ingest filings'}
-          </button>
+            {ingesting ? 'Ingesting…' : 'Ingest filings'}
+          </motion.button>
           <input
             type="password"
             value={ingestToken}
             onChange={(e) => setIngestToken(e.target.value)}
             placeholder="ingest token (if required)"
+            aria-label="Ingest token"
             className="border border-line px-3 py-2 text-xs w-52"
           />
         </div>
-        {ingestStatus && <p className="text-xs text-ink-dim">{ingestStatus}</p>}
+        <AnimatePresence mode="wait">
+          {ingesting ? (
+            <Pending key="ingesting" message="Fetching filings from EDGAR, chunking, embedding (~1 min)" />
+          ) : (
+            ingestStatus && (
+              <motion.p key="status" variants={fade} initial="hidden" animate="visible" exit="hidden" className="text-xs text-ink-dim">
+                {ingestStatus}
+              </motion.p>
+            )
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="border-t border-line pt-8">
-        <div className="space-y-6 mb-8 max-h-[28rem] overflow-y-auto">
-          {messages.length === 0 ? (
+        <div className="space-y-6 mb-8 max-h-[28rem] overflow-y-auto pr-1">
+          {messages.length === 0 && !loading ? (
             <p className="text-sm text-ink-faint py-10">
               Enter a ticker and ask a question about its SEC filings.
             </p>
           ) : (
             messages.map((msg, i) => (
-              <div key={i} className={msg.role === 'user' ? 'pl-0' : 'border-l border-line pl-4'}>
+              <motion.div
+                key={i}
+                variants={fadeUp}
+                initial="hidden"
+                animate="visible"
+                className={msg.role === 'user' ? 'pl-0' : 'border-l border-line pl-4'}
+              >
                 <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">
                   {msg.role === 'user' ? 'You' : 'StockRAG'}
                 </p>
@@ -116,44 +143,68 @@ export default function Ask() {
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-line">
                     <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">Sources</p>
-                    <ul className="space-y-1">
+                    <motion.ul
+                      variants={stagger(msg.sources.length)}
+                      initial="hidden"
+                      animate="visible"
+                      className="space-y-1"
+                    >
                       {msg.sources.map((src) => (
-                        <li key={src.index} className="text-xs text-ink-dim">
+                        <motion.li key={src.index} variants={fadeUp} className="text-xs text-ink-dim">
                           <span className="font-mono">[{src.index}]</span>{' '}
                           <span className="font-mono">{src.form}</span> {src.section}
                           <span className="text-ink-faint"> — {src.filing_date}</span>
-                        </li>
+                        </motion.li>
                       ))}
-                    </ul>
+                    </motion.ul>
                   </div>
                 )}
-              </div>
+              </motion.div>
             ))
           )}
+          {loading && (
+            <div className="border-l border-line pl-4">
+              <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">StockRAG</p>
+              <Pending message="Retrieving, reranking, generating…" />
+            </div>
+          )}
+          <div ref={threadEnd} />
         </div>
 
-        {error && (
-          <div className="mb-4 px-3 py-2 border border-err text-err text-sm">
-            {error}
-          </div>
-        )}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              key="error"
+              variants={fadeUp}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              role="alert"
+              className="mb-4 px-3 py-2 border border-err text-err text-sm"
+            >
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <form onSubmit={handleAsk} className="flex flex-col gap-3">
           <textarea
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="What are the key risks? Tell me about debt levels..."
+            aria-label="Question"
             rows={3}
             className="border border-line px-3 py-2 text-sm max-w-[72ch]"
           />
-          <div className="flex items-center gap-3">
-            <button
+          <div className="flex items-center gap-3 flex-wrap">
+            <motion.button
               type="submit"
+              whileTap={{ scale: 0.97 }}
               disabled={loading || !question.trim() || !ticker.trim()}
               className="bg-ink text-bg px-5 py-2 text-sm font-semibold hover:bg-ink-dim disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed"
             >
               {loading ? 'Asking…' : 'Ask'}
-            </button>
+            </motion.button>
             <select
               value={llm}
               onChange={(e) => setLlm(e.target.value)}
