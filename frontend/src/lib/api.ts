@@ -2,6 +2,21 @@
 // set VITE_API_URL to the deployed API origin (e.g. the HF Space URL).
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api'
 
+// Human-readable API target for the header status tooltip.
+export const API_BASE = import.meta.env.VITE_API_URL ?? 'localhost:8000 via /api'
+
+// FastAPI errors carry {"detail": "..."}; surface that instead of "404: Not Found".
+async function toError(res: Response): Promise<Error> {
+  try {
+    const body = await res.json()
+    if (typeof body?.detail === 'string') return new Error(body.detail)
+    if (body?.detail) return new Error(JSON.stringify(body.detail))
+  } catch {
+    // not JSON (e.g. proxy error page) — fall through
+  }
+  return new Error(`${res.status} ${res.statusText}`)
+}
+
 // Field names mirror stockrag.factor_engine.report.FactorReport exactly —
 // ratios come back as fractions (roe 1.52 = 152%), not percentages.
 export interface FactorReport {
@@ -61,7 +76,7 @@ export interface MetricsEntry {
 
 export async function getFactors(ticker: string): Promise<FactorReport> {
   const res = await fetch(`${BASE_URL}/factors/${encodeURIComponent(ticker)}`)
-  if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
+  if (!res.ok) throw await toError(res)
   return res.json()
 }
 
@@ -71,7 +86,7 @@ export async function ask(question: string, ticker: string, llm?: string): Promi
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question, ticker, llm }),
   })
-  if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
+  if (!res.ok) throw await toError(res)
   return res.json()
 }
 
@@ -89,7 +104,8 @@ export async function askStream(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question, ticker, llm }),
   })
-  if (!res.ok || !res.body) throw new Error(`${res.status}: ${res.statusText}`)
+  if (!res.ok) throw await toError(res)
+  if (!res.body) throw new Error('Response has no body to stream')
 
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -104,6 +120,7 @@ export async function askStream(
     for (const evt of events) {
       if (!evt.startsWith('data: ')) continue
       const data = JSON.parse(evt.slice(6))
+      if (data.error) throw new Error(data.error)
       if (data.done) final = data
       else if (data.token) onToken(data.token)
     }
@@ -129,7 +146,7 @@ export interface ThesisResponse {
 
 export async function getThesis(ticker: string): Promise<ThesisResponse> {
   const res = await fetch(`${BASE_URL}/thesis/${encodeURIComponent(ticker)}`)
-  if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
+  if (!res.ok) throw await toError(res)
   return res.json()
 }
 
@@ -145,7 +162,7 @@ export async function ingest(ticker: string, token?: string): Promise<IngestResp
     method: 'POST',
     headers: token ? { 'X-Ingest-Token': token } : {},
   })
-  if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
+  if (!res.ok) throw await toError(res)
   return res.json()
 }
 

@@ -181,22 +181,32 @@ def get_thesis(ticker: str, llm: str | None = None) -> ThesisResponse:
 def ask_stream_endpoint(request: AskRequest) -> StreamingResponse:
     """SSE stream: {"token": str} events as the answer generates, then one
     {"done": true, answer, sources, prompt_version} event with the validated
-    final answer (citation gate applied) that the client must render instead."""
+    final answer (citation gate applied) that the client must render instead.
+    A failure after headers are sent becomes one {"error": str} event, since
+    the 200 status can no longer change."""
 
     def gen():
-        for item in rag_ask_stream(request.question, request.ticker, llm_provider=request.llm):
-            if isinstance(item, AnswerResult):
-                payload = {
-                    "done": True,
-                    "answer": item.answer,
-                    "sources": [s.__dict__ for s in item.sources],
-                    "prompt_version": item.prompt_version,
-                }
-                yield f"data: {json.dumps(payload)}\n\n"
-            else:
-                yield f"data: {json.dumps({'token': item})}\n\n"
+        try:
+            for item in rag_ask_stream(request.question, request.ticker, llm_provider=request.llm):
+                if isinstance(item, AnswerResult):
+                    payload = {
+                        "done": True,
+                        "answer": item.answer,
+                        "sources": [s.__dict__ for s in item.sources],
+                        "prompt_version": item.prompt_version,
+                    }
+                    yield f"data: {json.dumps(payload)}\n\n"
+                else:
+                    yield f"data: {json.dumps({'token': item})}\n\n"
+        except Exception as exc:
+            logger.exception("ask/stream failed for %s", request.ticker)
+            yield f"data: {json.dumps({'error': f'{type(exc).__name__}: {exc}'})}\n\n"
 
-    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/ask")

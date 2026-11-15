@@ -32,3 +32,22 @@ def test_ask_stream_sse(monkeypatch):
     assert final["done"] is True
     assert final["answer"] == "Revenue grew [1]."
     assert final["sources"][0]["form"] == "10-K"
+
+
+def failing_stream(question, ticker, llm_provider=None):
+    yield "Revenue "
+    raise RuntimeError("401 Unauthorized from NIM")
+
+
+def test_ask_stream_error_event(monkeypatch):
+    monkeypatch.setattr(api_main, "rag_ask_stream", failing_stream)
+    client = TestClient(api_main.app)
+    resp = client.post("/ask/stream", json={"question": "q", "ticker": "AAPL"})
+    assert resp.status_code == 200
+    assert resp.headers["x-accel-buffering"] == "no"
+
+    events = [json.loads(e[len("data: "):]) for e in resp.text.strip().split("\n\n")]
+    assert events == [
+        {"token": "Revenue "},
+        {"error": "RuntimeError: 401 Unauthorized from NIM"},
+    ]

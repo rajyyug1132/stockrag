@@ -24,6 +24,14 @@ class Settings(BaseSettings):
 
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    # "local" (cross-encoder above) or "nvidia" (hosted NIM reranker, uses
+    # NVIDIA_API_KEY; falls back to local on any error). Default stays local
+    # so CI and offline runs never hit the network.
+    reranker_provider: str = "local"
+    nvidia_rerank_model: str = "nvidia/nemotron-3.5-rerank-8b"
+    nvidia_rerank_url: str = (
+        "https://ai.api.nvidia.com/v1/retrieval/nvidia/nemotron-3.5-rerank-8b/reranking"
+    )
 
     llm_provider: str = "nvidia"  # "nvidia" (NIM API), "gemini" (API), or "ollama" (local)
     ollama_model: str = "qwen3:4b"  # fits ~5GB free RAM; qwen3:14b needs 8.4GB

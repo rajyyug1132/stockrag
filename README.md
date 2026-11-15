@@ -188,12 +188,26 @@ React + Vite frontend over the same API. Four views: **Ask** (cited Q&A over
 filings), **Thesis** (evidence briefing), **Factors** (XBRL factor report with
 F-Score signals), **Metrics** (per-request latency, cost, citation coverage).
 
+### Run locally
+
+Two terminals, both started from the repo root (where `.env` lives):
+
 ```powershell
-uv run uvicorn stockrag.api.main:app --app-dir src   # terminal 1 — API on :8000
-cd frontend; npm install; npm run dev                # terminal 2 — UI on :5173
+# terminal 1 — API on :8000
+uv run uvicorn stockrag.api.main:app --app-dir src --port 8000 --env-file .env
+# terminal 2 — UI on :5173
+cd frontend; npm install; npm run dev
 ```
 
-Vite proxies `/api` to the API in dev; for a deployed API set `VITE_API_URL`.
+Open http://localhost:5173. The dot in the header polls `/health` every 15s:
+**API online** (mint) means the UI can reach uvicorn, and **API offline** (red)
+means it can't. In that case the header shows the command for terminal 1.
+Vite proxies `/api` to `localhost:8000` in dev. Set `VITE_API_URL` (see
+`frontend/.env.example`) only to point the UI at a non-proxied or deployed API.
+
+Backend errors reach the UI as text. A 404 or 403 shows FastAPI's `detail`
+message, and a failure mid-stream on Ask (bad key, empty index, model error)
+arrives as an `{"error": ...}` SSE event instead of a silently closed stream.
 
 There is a second, deliberately minimal Streamlit client in `streamlit_ui/`.
 It speaks HTTP only, so it deploys to Streamlit Cloud without dragging torch
