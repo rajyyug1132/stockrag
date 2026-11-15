@@ -1,0 +1,7 @@
+# Vercel deploys only the React frontend. Allowlist it so the Python backend
+# at the repo root (app.py, requirements.txt, pyproject.toml, src/) is never
+# uploaded; otherwise Vercel zero-config detects a FastAPI app and tries to
+# pip-install torch. The API is deployed separately (see README).
+/*
+!frontend
+!vercel.json
