@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'motion/react'
 import { API_BASE, getHealth } from '../lib/api'
 
 type View = 'ask' | 'thesis' | 'factors' | 'metrics'
@@ -66,19 +67,29 @@ export default function Header({ activeView, onViewChange }: HeaderProps) {
           </p>
         )}
         <nav className="flex gap-7">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onViewChange(tab.id)}
-              className={`pb-3 text-sm font-mono uppercase tracking-kicker border-b-2 transition-colors ${
-                activeView === tab.id
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-ink-faint hover:text-ink-dim'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const active = activeView === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onViewChange(tab.id)}
+                aria-current={active ? 'page' : undefined}
+                className={`relative pb-3 text-sm font-mono uppercase tracking-kicker transition-colors ${
+                  active ? 'text-accent' : 'text-ink-faint hover:text-ink-dim'
+                }`}
+              >
+                {tab.label}
+                {/* One underline that slides between tabs via the shared layoutId. */}
+                {active && (
+                  <motion.span
+                    layoutId="tab-underline"
+                    className="absolute left-0 right-0 -bottom-px h-0.5 bg-accent"
+                    transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                  />
+                )}
+              </button>
+            )
+          })}
         </nav>
       </div>
     </header>

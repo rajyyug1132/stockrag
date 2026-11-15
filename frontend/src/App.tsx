@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import Header from './components/Header'
+import { ease, fadeUp, stagger } from './components/motion'
 import Ask from './pages/Ask'
 import Factors from './pages/Factors'
 import Metrics from './pages/Metrics'
 import Thesis from './pages/Thesis'
 
 type View = 'ask' | 'thesis' | 'factors' | 'metrics'
+
+const PIPELINE = ['SEC EDGAR', 'section-aware chunking', 'BM25 + vector (RRF)', 'cross-encoder rerank', 'cited answer']
 
 const VIEWS: { id: View; label: string; hint: string }[] = [
   { id: 'ask', label: 'Ask', hint: 'Question filings with citations' },
@@ -109,26 +113,42 @@ export default function App() {
   }, [])
 
   return (
+    // reducedMotion="user": Motion animates from JS, so the CSS
+    // prefers-reduced-motion rule in index.css can't stop it on its own.
+    <MotionConfig reducedMotion="user">
     <div className="min-h-screen flex flex-col bg-bg">
       <ScrollProgress />
       <Header activeView={view} onViewChange={setView} />
       <div className="border-b border-line">
-        <div className="max-w-6xl mx-auto px-4 py-3 md:px-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-faint font-mono">
-          {['SEC EDGAR', 'section-aware chunking', 'BM25 + vector (RRF)', 'cross-encoder rerank', 'cited answer'].map(
-            (step, i) => (
-              <span key={step} className="flex items-center gap-3">
-                {i > 0 && <span aria-hidden="true" className="text-accent-dim">→</span>}
-                <span className="uppercase tracking-kicker">{step}</span>
-              </span>
-            )
-          )}
-        </div>
+        <motion.div
+          variants={stagger(PIPELINE.length, 0.4)}
+          initial="hidden"
+          animate="visible"
+          className="max-w-6xl mx-auto px-4 py-3 md:px-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-faint font-mono"
+        >
+          {PIPELINE.map((step, i) => (
+            <motion.span key={step} variants={fadeUp} className="flex items-center gap-3">
+              {i > 0 && <span aria-hidden="true" className="text-accent-dim">→</span>}
+              <span className="uppercase tracking-kicker">{step}</span>
+            </motion.span>
+          ))}
+        </motion.div>
       </div>
-      <main key={view} className="animate-view flex-1 max-w-6xl w-full mx-auto px-4 py-8 md:px-6 md:py-10">
-        {view === 'ask' && <Ask />}
-        {view === 'thesis' && <Thesis />}
-        {view === 'factors' && <Factors />}
-        {view === 'metrics' && <Metrics />}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8 md:px-6 md:py-10">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={view}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease }}
+          >
+            {view === 'ask' && <Ask />}
+            {view === 'thesis' && <Thesis />}
+            {view === 'factors' && <Factors />}
+            {view === 'metrics' && <Metrics />}
+          </motion.div>
+        </AnimatePresence>
       </main>
       <footer className="border-t border-line py-4 px-4 text-xs text-ink-faint font-mono">
         <div className="max-w-6xl mx-auto flex justify-between">
@@ -145,5 +165,6 @@ export default function App() {
         />
       )}
     </div>
+    </MotionConfig>
   )
 }

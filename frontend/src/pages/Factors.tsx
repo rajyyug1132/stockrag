@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { getFactors, type FactorReport } from '../lib/api'
+import { Pending, ScoreRing } from '../components/motion'
+import TickerForm from '../components/TickerForm'
 
 export default function Factors() {
   const [ticker, setTicker] = useState('')
@@ -7,10 +9,7 @@ export default function Factors() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleFetch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!ticker.trim()) return
-
+  const handleFetch = async () => {
     setLoading(true)
     setError('')
     setData(null)
@@ -82,43 +81,36 @@ export default function Factors() {
 
   return (
     <div className="flex flex-col gap-8">
-      <form onSubmit={handleFetch} className="flex flex-col gap-2">
-        <label className="text-xs uppercase tracking-kicker text-accent-dim font-mono">Company Ticker</label>
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value.toUpperCase())}
-            placeholder="AAPL, MSFT, TSLA, ..."
-            maxLength={5}
-            className="text-sm font-mono w-48"
-          />
-          <button
-            type="submit"
-            disabled={loading || !ticker.trim()}
-            className="bg-accent text-bg px-6 py-2.5 text-sm font-bold rounded-md transition-all hover:brightness-110 hover:-translate-y-px disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed disabled:translate-y-0 disabled:brightness-100"
-          >
-            {loading ? 'Loading…' : 'Get Factors'}
-          </button>
-        </div>
-      </form>
+      <TickerForm
+        ticker={ticker}
+        onTickerChange={setTicker}
+        onSubmit={handleFetch}
+        loading={loading}
+        submitLabel="Get Factors"
+        loadingLabel="Loading…"
+      />
 
       {error && (
-        <div className="px-3 py-2 border border-err text-err text-sm">
+        <div role="alert" className="px-3 py-2 border border-err text-err text-sm">
           {error}
         </div>
       )}
+
+      {loading && <Pending message="Pulling XBRL company facts and market data" />}
 
       {data && (
         <div className="border-t border-line">
           <div className="grid gap-4 py-6 sm:grid-cols-3">
             <div className="border border-line bg-surface p-4 rounded-xl hover-lift">
-              <p className="text-xs uppercase tracking-kicker text-accent-dim font-mono mb-2">Piotroski F-Score</p>
-              <p className="font-mono text-3xl text-ink">
-                {data.piotroski_score ?? '—'}
-                <span className="text-ink-faint text-lg">/9</span>
-              </p>
-              <p className="text-xs text-ink-faint mt-1">9 accounting signals (Piotroski, 2000)</p>
+              <p className="text-xs uppercase tracking-kicker text-accent-dim font-mono mb-3">Piotroski F-Score</p>
+              <div className="flex items-center gap-4">
+                <ScoreRing score={data.piotroski_score} />
+                <p className="text-xs text-ink-faint">
+                  out of 9 accounting signals
+                  <br />
+                  (Piotroski, 2000)
+                </p>
+              </div>
             </div>
             <div className="sm:col-span-2 border border-line bg-surface p-4 rounded-xl hover-lift">
               <p className="text-xs uppercase tracking-kicker text-accent-dim font-mono mb-3">Flowchart checks</p>
@@ -176,7 +168,7 @@ export default function Factors() {
         </div>
       )}
 
-      {!data && !error && (
+      {!data && !error && !loading && (
         <p className="text-sm text-ink-faint py-10">
           Enter a ticker to view financial factors from SEC XBRL data.
         </p>
