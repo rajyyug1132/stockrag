@@ -34,3 +34,37 @@
   `uv run python eval/run_eval.py --subset smoke --freeze eval/fixtures/smoke_answers.json`
 - Judge metrics (faithfulness/relevancy/precision) are advisory, run locally.
 - CI never hits SEC EDGAR (fixture filing only). Keep it that way.
+
+## Model routing (workflow template)
+Route each task to the cheapest tier that can do it safely; subagents in
+`.claude/agents/` carry the model and effort in their frontmatter.
+
+| Task | Agent | Model @ effort |
+| --- | --- | --- |
+| Plan a feature, security audit | main session | fable @ high / xhigh |
+| Search the codebase | `scout` (read-only) | haiku @ low |
+| Renames, boilerplate | main session, inline | read the diff afterwards |
+| Build backend from a plan | `builder` | sonnet @ medium |
+| Write tests | `test-writer` | sonnet @ low |
+| Frontend UI | `ui-builder` | opus @ medium |
+| Ingest-token / auth-adjacent code | main session or `debugger` | opus @ xhigh, never haiku |
+| Bug that survived one fix attempt | `debugger` | opus @ max |
+| Review before commit | `reviewer` | opus @ high |
+
+Standard feature workflow — copy, fill in, run top to bottom:
+
+1. **Locate** — `scout`: where does `<thing>` live, who calls it.
+2. **Plan** — main session: files to touch, behaviour, what done looks like.
+   Small enough to do in a handful of edits? Do it inline and skip to 5.
+3. **Build** — `builder` (backend) or `ui-builder` (frontend) with the plan
+   from step 2. Independent backend and frontend halves run in parallel.
+4. **Test** — `test-writer` for new behaviour not covered in step 3.
+5. **Review** — `reviewer` on the diff. It must be a different model from the
+   one that wrote the code.
+6. **Gate** — `uv run pytest -q`, `uv run ruff check src tests eval streamlit_ui`;
+   regenerate the frozen fixture from the repo root if answers changed.
+
+Rules: route by risk before cost. Raise effort before changing model.
+Escalate one tier after one failed attempt, not three. Never switch model
+mid-task (the prompt cache is per model) — hand off to a subagent instead.
+Always read the diff after mechanical edits.
