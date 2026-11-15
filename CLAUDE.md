@@ -12,6 +12,11 @@
   `mistral-large-2-instruct` and `llama-3.1-nemotron-70b-instruct` are listed but
   404 for this account.
 - Generation model: `minimaxai/minimax-m3.1-flash` (cites per claim, ~4s/answer).
+- Embeddings (Supabase path): `nvidia/nemotron-3.5-embed-1b` at `dimensions: 1024`,
+  confirmed 2026-11-15. `llama-3.2-nv-embedqa-1b-v2`, `llama-nemotron-embed-1b-v2`
+  and `baai/bge-m3` are 410 Gone. Changing model or size means re-embedding
+  everything and a migration for `vector(N)`; check with
+  `scripts/probe_nim_embed.py --confirm <model> --dim <N>` from the repo root.
 - `nvidia/nemotron-3-ultra-550b-a55b` works but runs 2–4 min/call → Ragas judge
   timeouts. Judge default is `nvidia/nemotron-3.5-lightning-30b-a3b` (<1s/call,
   not yet validated under Ragas). A validated fast judge model is an open TODO.

@@ -9,6 +9,10 @@ reports: does it answer, vector size, the largest passage it embeds without
 truncation, whether `input_type` is required, and latency. A chunk is up to
 650 cl100k tokens (CHUNK_TOKENS), so the pick must accept at least that.
 Never prints the API key. Makes ~6 calls per model.
+
+To confirm one model at a requested vector size instead (3 calls):
+
+    uv run python scripts/probe_nim_embed.py --confirm nvidia/nemotron-3.5-embed-1b --dim 1024
 """
 
 import json
@@ -22,13 +26,12 @@ from stockrag.ingestion.chunk import _ENCODING
 from stockrag.ingestion.parse import parse_filing_sections
 
 BASE = settings.nvidia_base_url.rstrip("/")
+# Probed even if unlisted. llama-3.2-nv-embedqa-1b-v2, llama-nemotron-embed-1b-v2
+# and baai/bge-m3 answer 410 Gone (retired) as of 2026-11-15.
 KNOWN = [
-    "nvidia/llama-3.2-nv-embedqa-1b-v2",
-    "nvidia/llama-nemotron-embed-1b-v2",
-    "nvidia/nv-embedqa-e5-v5",
+    "nvidia/nemotron-3.5-embed-1b",
+    "nvidia/nemotron-3.5-embed-8b",
     "nvidia/nv-embedqa-mistral-7b-v2",
-    "nvidia/nv-embed-v1",
-    "baai/bge-m3",
     "snowflake/arctic-embed-l",
 ]
 # cl100k token counts to try, smallest first; stop at the first failure.
@@ -62,11 +65,18 @@ def _passage_tokens() -> list[int]:
 
 
 def _embed(
-    client: httpx.Client, model: str, text: str, input_type: str | None, strict: bool = True
+    client: httpx.Client,
+    model: str,
+    text: str,
+    input_type: str | None,
+    strict: bool = True,
+    dimensions: int | None = None,
 ) -> tuple[list[float], float]:
     """One embedding call. strict sends truncate=NONE so an over-long input
     errors instead of being silently cut. A 429/5xx/timeout is retried once."""
     body: dict = {"model": model, "input": [text], "encoding_format": "float"}
+    if dimensions:
+        body["dimensions"] = dimensions
     if strict:
         body["truncate"] = "NONE"
     if input_type:
@@ -141,11 +151,38 @@ def probe(client: httpx.Client, model: str, tokens: list[int]) -> dict:
     return row
 
 
+def confirm(client: httpx.Client, model: str, dim: int, tokens: list[int]) -> bool:
+    """Passage at the chunk size and at ~2x, plus a query, all at `dim`."""
+    ok = True
+    for label, text, input_type in (
+        (f"passage {settings.chunk_tokens} cl100k", _ENCODING.decode(tokens[: settings.chunk_tokens]), "passage"),
+        ("passage 1300 cl100k", _ENCODING.decode(tokens[:1300]), "passage"),
+        ("query", "What are Apple's main risk factors?", "query"),
+    ):
+        try:
+            vec, secs = _embed(client, model, text, input_type, dimensions=dim)
+        except ProbeError as exc:
+            print(f"FAIL {label}: {exc}")
+            ok = False
+            continue
+        good = len(vec) == dim
+        ok &= good
+        print(f"{'OK  ' if good else 'FAIL'} {label}: {len(vec)}-d in {secs:.2f}s")
+    return ok
+
+
 def main() -> int:
     if not settings.nvidia_api_key:
         print("NVIDIA_API_KEY is not set: run this from the repo root, where .env lives.")
         return 1
     headers = {"Authorization": f"Bearer {settings.nvidia_api_key}", "Accept": "application/json"}
+    if "--confirm" in sys.argv:
+        model = sys.argv[sys.argv.index("--confirm") + 1]
+        dim = int(sys.argv[sys.argv.index("--dim") + 1])
+        with httpx.Client(headers=headers, timeout=60.0) as client:
+            ok = confirm(client, model, dim, _passage_tokens())
+        print(f"\n{model} at {dim} dimensions: {'ACCEPTED' if ok else 'NOT accepted'}")
+        return 0 if ok else 1
     with httpx.Client(headers=headers, timeout=60.0) as client:
         resp = client.get(f"{BASE}/models")
         if resp.status_code != 200:

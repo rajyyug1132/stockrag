@@ -34,12 +34,16 @@ class Settings(BaseSettings):
     # queried with the same one.
     embedding_provider: str = "local"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
-    # Provisional until scripts/probe_nim_embed.py confirms it for this account.
-    nvidia_embed_model: str = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+    # Confirmed 2026-11-15 (scripts/probe_nim_embed.py --confirm): 1024-d via the
+    # `dimensions` parameter, 650- and 1300-token passages untruncated, ~0.6s.
+    # llama-3.2-nv-embedqa-1b-v2, llama-nemotron-embed-1b-v2 and baai/bge-m3
+    # are retired (410 Gone).
+    nvidia_embed_model: str = "nvidia/nemotron-3.5-embed-1b"
     nvidia_embed_url: str = "https://integrate.api.nvidia.com/v1/embeddings"
-    # Vector size of nvidia_embed_model; must equal vector(N) in
-    # supabase/migrations (tests/test_migrations.py). Provisional with the model.
-    nvidia_embed_dim: int = 2048
+    # Vector size requested from nvidia_embed_model; must equal vector(N) in
+    # supabase/migrations (tests/test_migrations.py). 1024 stays under
+    # pgvector's 2000-dim limit for HNSW/ivfflat should an index be needed.
+    nvidia_embed_dim: int = 1024
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     # "local" (cross-encoder above) or "nvidia" (hosted NIM reranker, uses
     # NVIDIA_API_KEY; falls back to local on any error). Default stays local

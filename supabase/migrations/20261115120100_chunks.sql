@@ -1,9 +1,9 @@
 -- Filing chunks: one row per "{accession}:{chunk_index}", same ids and
 -- metadata as the Chroma collection.
 --
--- EMBED_DIM PLACEHOLDER: 2048 is provisional until scripts/probe_nim_embed.py
--- confirms the NIM embedding model. Every vector(N) in these migrations must
--- equal settings.nvidia_embed_dim (tests/test_migrations.py checks it).
+-- EMBED_DIM 1024: nvidia/nemotron-3.5-embed-1b asked for 1024 dimensions.
+-- Every vector(N) in these migrations must equal settings.nvidia_embed_dim
+-- (tests/test_migrations.py checks it).
 create table public.chunks (
   id          text primary key,
   ticker      text    not null,
@@ -15,7 +15,7 @@ create table public.chunks (
   char_start  integer not null,
   char_end    integer not null,
   content     text    not null,
-  embedding   extensions.vector(2048) not null,
+  embedding   extensions.vector(1024) not null,
   fts         tsvector generated always as (to_tsvector('english', content)) stored
 );
 
