@@ -1,10 +1,13 @@
 import json
+import logging
 import os
 import tempfile
+import threading
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 
 from stockrag.api.docs import DOCS_HTML
 from stockrag.config import settings
@@ -18,11 +21,58 @@ from stockrag.api.schemas import (
 )
 from stockrag.factor_engine.report import FactorReport, build_factor_report
 from stockrag.ingestion.pipeline import ingest_pdf, ingest_ticker
-from stockrag.rag.answer import ask as rag_ask
+from stockrag.rag.answer import AnswerResult, ask as rag_ask, ask_stream as rag_ask_stream
 from stockrag.rag.metrics import metrics_path
 from stockrag.rag.thesis import build_thesis
 
-app = FastAPI(title="StockRAG", docs_url=None)
+# uvicorn only attaches handlers to its own loggers, so a module logger's INFO
+# lines would never reach the server log (e.g. the Space's boot log).
+logger = logging.getLogger("uvicorn.error")
+
+# Set by the lifespan when AUTO_INGEST_TICKERS is non-empty; tests can join it.
+auto_ingest_thread: threading.Thread | None = None
+
+
+def _parse_tickers(raw: str) -> list[str]:
+    """Comma-separated tickers -> stripped, upper-cased, de-duplicated, order kept."""
+    seen: dict[str, None] = {}
+    for part in raw.split(","):
+        ticker = part.strip().upper()
+        if ticker:
+            seen.setdefault(ticker)
+    return list(seen)
+
+
+def _auto_ingest(tickers: list[str]) -> None:
+    for ticker in tickers:
+        logger.info("auto-ingest: starting %s", ticker)
+        try:
+            result = ingest_ticker(ticker)
+        except Exception:
+            logger.exception("auto-ingest: %s failed", ticker)
+            continue
+        logger.info(
+            "auto-ingest: finished %s (filings_ingested=%d, chunks_added=%d)",
+            ticker,
+            result.filings_ingested,
+            result.chunks_added,
+        )
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    global auto_ingest_thread
+    auto_ingest_thread = None
+    tickers = _parse_tickers(settings.auto_ingest_tickers)
+    if tickers:
+        auto_ingest_thread = threading.Thread(
+            target=_auto_ingest, args=(tickers,), name="auto-ingest", daemon=True
+        )
+        auto_ingest_thread.start()
+    yield
+
+
+app = FastAPI(title="StockRAG", docs_url=None, lifespan=lifespan)
 
 # Frontend is deployed on a different origin (Vercel) than the API (HF Spaces).
 app.add_middleware(
@@ -124,6 +174,38 @@ def get_thesis(ticker: str, llm: str | None = None) -> ThesisResponse:
             for s in result.sections
         ],
         prompt_version=result.prompt_version,
+    )
+
+
+@app.post("/ask/stream")
+def ask_stream_endpoint(request: AskRequest) -> StreamingResponse:
+    """SSE stream: {"token": str} events as the answer generates, then one
+    {"done": true, answer, sources, prompt_version} event with the validated
+    final answer (citation gate applied) that the client must render instead.
+    A failure after headers are sent becomes one {"error": str} event, since
+    the 200 status can no longer change."""
+
+    def gen():
+        try:
+            for item in rag_ask_stream(request.question, request.ticker, llm_provider=request.llm):
+                if isinstance(item, AnswerResult):
+                    payload = {
+                        "done": True,
+                        "answer": item.answer,
+                        "sources": [s.__dict__ for s in item.sources],
+                        "prompt_version": item.prompt_version,
+                    }
+                    yield f"data: {json.dumps(payload)}\n\n"
+                else:
+                    yield f"data: {json.dumps({'token': item})}\n\n"
+        except Exception as exc:
+            logger.exception("ask/stream failed for %s", request.ticker)
+            yield f"data: {json.dumps({'error': f'{type(exc).__name__}: {exc}'})}\n\n"
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

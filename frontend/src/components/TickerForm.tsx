@@ -27,7 +27,7 @@ export default function TickerForm({
       }}
       className="flex flex-col gap-2"
     >
-      <label htmlFor="ticker" className="text-xs uppercase tracking-kicker text-ink-faint">
+      <label htmlFor="ticker" className="text-xs uppercase tracking-kicker text-accent-dim font-mono">
         Company Ticker
       </label>
       <div className="flex gap-3">
@@ -38,13 +38,13 @@ export default function TickerForm({
           onChange={(e) => onTickerChange(e.target.value.toUpperCase())}
           placeholder="AAPL, MSFT, TSLA, ..."
           maxLength={5}
-          className="border border-line px-3 py-2 text-sm font-mono w-48"
+          className="text-sm font-mono w-48"
         />
         <motion.button
           type="submit"
           whileTap={{ scale: 0.97 }}
           disabled={loading || !ticker.trim()}
-          className="bg-ink text-bg px-5 py-2 text-sm font-semibold hover:bg-ink-dim disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed"
+          className="bg-accent text-bg px-6 py-2.5 text-sm font-bold rounded-md transition-[filter] hover:brightness-110 disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed disabled:brightness-100"
         >
           {loading ? loadingLabel : submitLabel}
         </motion.button>

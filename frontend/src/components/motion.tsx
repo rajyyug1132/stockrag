@@ -100,12 +100,12 @@ export function Pending({ message }: { message: string }) {
     <motion.div variants={fade} initial="hidden" animate="visible" exit="hidden" role="status" className="flex flex-col gap-2">
       <div className="relative h-px w-full max-w-[72ch] bg-line overflow-hidden">
         <motion.div
-          className="absolute inset-y-0 left-0 w-1/3 bg-ink-dim"
+          className="absolute inset-y-0 left-0 w-1/3 bg-accent"
           animate={{ x: ['-100%', '300%'] }}
           transition={{ duration: 1.4, ease: 'easeInOut', repeat: Infinity }}
         />
       </div>
-      <p className="text-xs text-ink-faint flex gap-2">
+      <p className="text-xs text-ink-faint font-mono flex gap-2">
         <span>{message}</span>
         <motion.span className="font-mono">{label}</motion.span>
       </p>

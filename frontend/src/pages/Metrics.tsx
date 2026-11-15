@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'motion/react'
 import { getMetrics, type MetricsEntry } from '../lib/api'
-import { Bar, CountUp, fadeUp, stagger } from '../components/motion'
+import { Bar, CountUp } from '../components/motion'
 
 export default function Metrics() {
   const [entries, setEntries] = useState<MetricsEntry[]>([])
@@ -33,35 +32,29 @@ export default function Metrics() {
       : 0,
     uniqueTickers: new Set(entries.map(e => e.ticker)).size,
   }
-  const visible = entries.slice(0, 20)
 
   const statusColor = (status: string) =>
     status === 'ok' ? 'text-ok' : status === 'refused' ? 'text-warn' : 'text-err'
 
   return (
     <div className="flex flex-col gap-8">
-      <motion.div
-        variants={stagger(4, 0.2)}
-        initial="hidden"
-        animate="visible"
-        className="grid grid-cols-2 md:grid-cols-4 gap-px bg-line border border-line"
-      >
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-line border border-line">
         {[
           { label: 'Total Queries', value: stats.totalQueries, format: (n: number) => n.toFixed(0) },
           { label: 'Success Rate', value: stats.successRate, format: (n: number) => `${n.toFixed(1)}%` },
           { label: 'Avg Latency', value: stats.avgLatency, format: (n: number) => `${n.toFixed(0)}ms` },
           { label: 'Unique Tickers', value: stats.uniqueTickers, format: (n: number) => n.toFixed(0) },
-        ].map((stat) => (
-          <motion.div key={stat.label} variants={fadeUp} className="bg-bg p-4">
-            <p className="text-xs uppercase tracking-kicker text-ink-faint mb-2">{stat.label}</p>
+        ].map((stat, i) => (
+          <div key={stat.label} className="animate-item bg-bg p-4" style={{ animationDelay: `${i * 70}ms` }}>
+            <p className="text-xs uppercase tracking-kicker text-accent-dim font-mono mb-2">{stat.label}</p>
             <CountUp
               value={stat.value}
               format={stat.format}
               className="block text-2xl font-semibold tracking-tightest text-ink font-mono"
             />
-          </motion.div>
+          </div>
         ))}
-      </motion.div>
+      </div>
 
       {error && (
         <div className="px-3 py-2 border border-err text-err text-sm">
@@ -86,11 +79,11 @@ export default function Metrics() {
                 <th className="text-left text-xs uppercase tracking-kicker text-ink-faint font-medium px-3 py-3 bg-transparent">Status</th>
               </tr>
             </thead>
-            <motion.tbody variants={stagger(visible.length, 0.4)} initial="hidden" animate="visible">
-              {visible.map((entry, i) => {
+            <tbody>
+              {entries.slice(0, 20).map((entry, i) => {
                 const status = entry.error ? 'error' : entry.refused ? 'refused' : 'ok'
                 return (
-                  <motion.tr key={i} variants={fadeUp} className="hover:bg-surface transition-colors">
+                  <tr key={i} className="animate-item hover:bg-surface transition-colors" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
                     <td className="px-0 py-3 text-xs font-mono text-ink-dim">
                       {new Date(entry.timestamp).toLocaleString()}
                     </td>
@@ -108,10 +101,10 @@ export default function Metrics() {
                     <td className={`px-3 py-3 text-xs font-mono uppercase ${statusColor(status)}`}>
                       {status}
                     </td>
-                  </motion.tr>
+                  </tr>
                 )
               })}
-            </motion.tbody>
+            </tbody>
           </table>
           {entries.length > 20 && (
             <p className="py-3 text-xs text-ink-faint">
