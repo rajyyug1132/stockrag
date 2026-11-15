@@ -35,6 +35,10 @@ class Settings(BaseSettings):
 
     llm_provider: str = "nvidia"  # "nvidia" (NIM API), "gemini" (API), or "ollama" (local)
     ollama_model: str = "qwen3:4b"  # fits ~5GB free RAM; qwen3:14b needs 8.4GB
+    # Token budget for retrieved context sent to Ollama. Must leave room inside
+    # num_ctx (8192, rag/llm.py) for the rules, the question and the answer;
+    # counted with cl100k, which undercounts qwen's tokenizer a little.
+    ollama_context_tokens: int = 5500
     gemini_model: str = "gemini-3.5-flash"  # 2.5-flash is 404 for new API keys
 
     # NVIDIA NIM (OpenAI-compatible); free endpoint, no daily-20 cap like Gemini free tier.

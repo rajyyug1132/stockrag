@@ -6,15 +6,16 @@ from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 
 from stockrag.config import settings
-from stockrag.rag.llm import get_llm
+from stockrag.ingestion.chunk import _ENCODING
 from stockrag.rag.expand import expand_docs
+from stockrag.rag.llm import get_llm
 from stockrag.rag.metrics import citation_coverage, estimate_cost_usd, record_request
 from stockrag.rag.prompts import load_prompt
 from stockrag.rag.store import get_vector_store
 from stockrag.rag.tracing import tracing_callbacks
 
 DEFAULT_K = 6
-CITATION_RE = re.compile(r"\[\d+\]")
+CITATION_RE = re.compile(r"\s*\[(\d+)\]")
 # Thinking models (qwen3) sometimes leak reasoning despite reasoning=False;
 # drop everything up to the last closing think tag.
 THINK_BLOCK_RE = re.compile(r"^.*</think>\s*", re.DOTALL)
@@ -76,6 +77,44 @@ def _format_docs(docs: list[Document]) -> tuple[str, list[Source]]:
     return "\n\n".join(lines), sources
 
 
+def _finalize(raw: str, n_sources: int) -> str:
+    """Turn raw model output into the answer we are willing to show: strip
+    leaked reasoning, drop citations that point at no retrieved source, and
+    refuse if nothing cited survives. Shared by ask() and ask_stream() so the
+    two paths cannot drift."""
+    answer = THINK_BLOCK_RE.sub("", raw).strip()
+    # A [14] against six sources is a hallucinated citation, not grounding:
+    # remove it so the sentence counts as uncited instead of passing the gate.
+    answer = CITATION_RE.sub(
+        lambda m: m.group(0) if 1 <= int(m.group(1)) <= n_sources else "", answer
+    )
+    return answer if CITATION_RE.search(answer) else NO_CONTEXT_MESSAGE
+
+
+def _context_docs(docs: list[Document], ticker: str, provider: str) -> list[Document]:
+    """Small-to-big: widen each reranked chunk to its section neighbours so
+    the LLM sees surrounding context; citations still map to the retrieved
+    chunk's metadata.
+
+    Ollama runs a fixed context window and truncates an oversized prompt from
+    the front — which is where the rules and the question are — so for it the
+    context is shrunk to fit: unwidened chunks first, then fewer of them
+    (lowest-ranked dropped first)."""
+    expanded = expand_docs(docs, ticker, window=settings.parent_window)
+    if provider != "ollama":
+        return expanded
+
+    def tokens(ds: list[Document]) -> int:
+        return sum(len(_ENCODING.encode(d.page_content)) for d in ds)
+
+    budget = settings.ollama_context_tokens
+    if tokens(expanded) <= budget:
+        return expanded
+    while len(docs) > 1 and tokens(docs) > budget:
+        docs = docs[:-1]
+    return docs
+
+
 def ask(
     question: str,
     ticker: str,
@@ -109,22 +148,14 @@ def ask(
                 answer=NO_CONTEXT_MESSAGE, sources=[], prompt_version=prompt_version, contexts=[]
             )
 
-        # Small-to-big: widen each reranked chunk to its section neighbours so
-        # the LLM sees surrounding context; citations still map to the retrieved
-        # chunk's metadata.
-        docs = expand_docs(docs, ticker, window=settings.parent_window)
+        docs = _context_docs(docs, ticker, provider)
         context, sources = _format_docs(docs)
         chain = load_prompt(prompt_version) | get_llm(llm_provider)
         llm_started = time.perf_counter()
         message = chain.invoke({"question": question, "context": context}, config=config)
         metric["llm_ms"] = round((time.perf_counter() - llm_started) * 1000)
 
-        answer = THINK_BLOCK_RE.sub("", str(message.content)).strip()
-
-        # Refuse answers that dodge citation enforcement rather than trusting
-        # uncited claims.
-        if not CITATION_RE.search(answer):
-            answer = NO_CONTEXT_MESSAGE
+        answer = _finalize(str(message.content), len(sources))
 
         usage = getattr(message, "usage_metadata", None) or {}
         input_tokens = usage.get("input_tokens", 0)
@@ -190,7 +221,7 @@ def ask_stream(
             )
             return
 
-        docs = expand_docs(docs, ticker, window=settings.parent_window)
+        docs = _context_docs(docs, ticker, provider)
         context, sources = _format_docs(docs)
         chain = load_prompt(prompt_version) | get_llm(llm_provider)
         llm_started = time.perf_counter()
@@ -214,9 +245,9 @@ def ask_stream(
                 emitted = len(buffer)
         metric["llm_ms"] = round((time.perf_counter() - llm_started) * 1000)
 
-        answer = buffer.strip()
-        if not CITATION_RE.search(answer):
-            answer = NO_CONTEXT_MESSAGE
+        # The buffer can still hold reasoning when the model emitted a bare
+        # </think> with no opening tag (qwen3 does); _finalize strips it.
+        answer = _finalize(buffer, len(sources))
 
         # ponytail: streaming chunks don't carry usage_metadata reliably; token
         # counts/cost stay unrecorded for streamed asks — add aggregation if
