@@ -39,14 +39,18 @@ class Settings(BaseSettings):
 
     # NVIDIA NIM (OpenAI-compatible); free endpoint, no daily-20 cap like Gemini free tier.
     nvidia_api_key: str = ""
-    # Generation: nemotron-super cites reliably (~3-10s/answer). Judge: Ragas fires
-    # ~4 long prompts per question; nemotron-super ran 8-100s/call under CI load →
-    # mass judge timeouts, while mistral-nemotron answers judge prompts in ~1s.
-    nvidia_model: str = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
-    # mistral-nemotron: ~1s/call. Earlier verdict swings (faithfulness 0.86 ->
-    # 0.375 same input) were the judge running at temperature 0.2, not the
-    # model — run_eval now pins the judge to temperature 0.0.
-    nvidia_judge_model: str = "mistralai/mistral-nemotron"
+    # Generation: minimax-m3.1-flash cites per claim (smoke citation_coverage
+    # 0.86, ~4s/answer warm). Replaced llama-3.3-nemotron-super-49b-v1.5, which
+    # NVIDIA retired 2026-08-26 (410 Gone). nemotron-3.5-lightning-30b-a3b is
+    # faster but cited at paragraph end (coverage 0.70); several other listed
+    # models (nemotron-3-super-120b, nemotron-nano-3, mistral-large-2) 404 on
+    # invoke for this account.
+    nvidia_model: str = "minimaxai/minimax-m3.1-flash"
+    # Judge: mistral-nemotron was retired 2026-09-28 (410). lightning answers in
+    # <1s per call but hasn't been validated as a Ragas judge yet (open TODO).
+    # run_eval pins the judge to temperature 0.0; verdict swings at 0.2 were the
+    # temperature, not the model.
+    nvidia_judge_model: str = "nvidia/nemotron-3.5-lightning-30b-a3b"
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
 
     chunk_tokens: int = 650
