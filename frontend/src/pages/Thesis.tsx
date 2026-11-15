@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { getThesis, type ThesisResponse } from '../lib/api'
 import { Markdown } from '../components/Markdown'
+import { Bar, Pending } from '../components/motion'
+import TickerForm from '../components/TickerForm'
 
 export default function Thesis() {
   const [ticker, setTicker] = useState('')
@@ -8,10 +10,7 @@ export default function Thesis() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleFetch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!ticker.trim()) return
-
+  const handleFetch = async () => {
     setLoading(true)
     setError('')
     setData(null)
@@ -28,34 +27,31 @@ export default function Thesis() {
 
   return (
     <div className="flex flex-col gap-8">
-      <form onSubmit={handleFetch} className="flex flex-col gap-2">
-        <label className="text-xs uppercase tracking-kicker text-accent-dim font-mono">Company Ticker</label>
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value.toUpperCase())}
-            placeholder="AAPL, MSFT, TSLA, ..."
-            maxLength={5}
-            className="text-sm font-mono w-48"
-          />
-          <button
-            type="submit"
-            disabled={loading || !ticker.trim()}
-            className="bg-accent text-bg px-6 py-2.5 text-sm font-bold rounded-md transition-all hover:brightness-110 hover:-translate-y-px disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed disabled:translate-y-0 disabled:brightness-100"
-          >
-            {loading ? 'Building… (takes a few minutes)' : 'Build Thesis'}
-          </button>
-        </div>
-        <p className="text-xs text-ink-faint">
-          Factor report + filing evidence, synthesized into an evidence briefing.
-          Not investment advice. Ingest the ticker first.
-        </p>
-      </form>
+      <TickerForm
+        ticker={ticker}
+        onTickerChange={setTicker}
+        onSubmit={handleFetch}
+        loading={loading}
+        submitLabel="Build Thesis"
+        loadingLabel="Building…"
+        hint="Factor report + filing evidence, synthesized into an evidence briefing. Not investment advice. Ingest the ticker first."
+      />
 
       {error && (
-        <div className="px-3 py-2 border border-err text-err text-sm">
+        <div role="alert" className="px-3 py-2 border border-err text-err text-sm">
           {error}
+        </div>
+      )}
+
+      {loading && (
+        <div className="border-t border-line pt-6 flex flex-col gap-6">
+          <Pending message="Answering each thesis question against the filings, then synthesizing (a few minutes)" />
+          {/* Skeleton of the briefing so the page doesn't jump when it lands. */}
+          <div className="flex flex-col gap-2 max-w-[72ch] animate-pulse" aria-hidden="true">
+            {[100, 92, 96, 70].map((w) => (
+              <div key={w} className="h-3 bg-surface rounded" style={{ width: `${w}%` }} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -81,8 +77,8 @@ export default function Thesis() {
                 >
                   <summary className="cursor-pointer text-sm font-medium text-ink hover:text-ink-dim">
                     {section.topic.replace(/_/g, ' ')}{' '}
-                    <span className="font-mono text-xs text-ink-faint">
-                      · {(section.grounding * 100).toFixed(0)}% grounded
+                    <span className="font-mono text-xs text-ink-faint inline-flex items-center gap-2">
+                      · <Bar value={section.grounding} className="w-12" /> {(section.grounding * 100).toFixed(0)}% grounded
                     </span>
                   </summary>
                   <div className="mt-3">

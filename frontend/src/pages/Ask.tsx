@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { askStream, ingest } from '../lib/api'
 import type { Source } from '../lib/api'
 import { Markdown } from '../components/Markdown'
+import { Pending } from '../components/motion'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -92,7 +93,7 @@ export default function Ask() {
             disabled={ingesting || !ticker.trim()}
             className="border border-line text-ink-dim px-4 py-2.5 text-sm rounded-md hover:text-ink hover:border-ink-faint disabled:text-ink-faint disabled:cursor-not-allowed"
           >
-            {ingesting ? 'Ingesting… (~1 min)' : 'Ingest filings'}
+            {ingesting ? 'Ingesting…' : 'Ingest filings'}
           </button>
           <input
             type="password"
@@ -102,7 +103,11 @@ export default function Ask() {
             className="text-xs w-52"
           />
         </div>
-        {ingestStatus && <p className="text-xs text-ink-dim">{ingestStatus}</p>}
+        {ingesting ? (
+          <Pending message="Fetching filings from EDGAR, chunking, embedding (~1 min)" />
+        ) : (
+          ingestStatus && <p className="text-xs text-ink-dim">{ingestStatus}</p>
+        )}
       </div>
 
       <div className="border-t border-line pt-8">
@@ -122,6 +127,9 @@ export default function Ask() {
                   <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink max-w-[72ch]">
                     {msg.content}
                   </p>
+                ) : msg.content === '' && loading ? (
+                  // Streamed tokens replace this once the first one arrives.
+                  <Pending message="Retrieving, reranking, generating…" />
                 ) : (
                   <Markdown text={msg.content} />
                 )}
@@ -145,7 +153,7 @@ export default function Ask() {
         </div>
 
         {error && (
-          <div className="mb-4 px-3 py-2 border border-err text-err text-sm">
+          <div role="alert" className="mb-4 px-3 py-2 border border-err text-err text-sm">
             {error}
           </div>
         )}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getMetrics, type MetricsEntry } from '../lib/api'
+import { Bar, CountUp } from '../components/motion'
 
 export default function Metrics() {
   const [entries, setEntries] = useState<MetricsEntry[]>([])
@@ -24,10 +25,10 @@ export default function Metrics() {
   const stats = {
     totalQueries: entries.length,
     successRate: entries.length > 0
-      ? (((entries.length - entries.filter(e => e.error || e.refused).length) / entries.length) * 100).toFixed(1)
+      ? ((entries.length - entries.filter(e => e.error || e.refused).length) / entries.length) * 100
       : 0,
     avgLatency: latencies.length > 0
-      ? (latencies.reduce((a, b) => a + b, 0) / latencies.length).toFixed(0)
+      ? latencies.reduce((a, b) => a + b, 0) / latencies.length
       : 0,
     uniqueTickers: new Set(entries.map(e => e.ticker)).size,
   }
@@ -39,14 +40,18 @@ export default function Metrics() {
     <div className="flex flex-col gap-8">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-line border border-line">
         {[
-          { label: 'Total Queries', value: stats.totalQueries },
-          { label: 'Success Rate', value: `${stats.successRate}%` },
-          { label: 'Avg Latency', value: `${stats.avgLatency}ms` },
-          { label: 'Unique Tickers', value: stats.uniqueTickers },
+          { label: 'Total Queries', value: stats.totalQueries, format: (n: number) => n.toFixed(0) },
+          { label: 'Success Rate', value: stats.successRate, format: (n: number) => `${n.toFixed(1)}%` },
+          { label: 'Avg Latency', value: stats.avgLatency, format: (n: number) => `${n.toFixed(0)}ms` },
+          { label: 'Unique Tickers', value: stats.uniqueTickers, format: (n: number) => n.toFixed(0) },
         ].map((stat, i) => (
           <div key={stat.label} className="animate-item bg-bg p-4" style={{ animationDelay: `${i * 70}ms` }}>
             <p className="text-xs uppercase tracking-kicker text-accent-dim font-mono mb-2">{stat.label}</p>
-            <p className="text-2xl font-semibold tracking-tightest text-ink font-mono">{stat.value}</p>
+            <CountUp
+              value={stat.value}
+              format={stat.format}
+              className="block text-2xl font-semibold tracking-tightest text-ink font-mono"
+            />
           </div>
         ))}
       </div>
@@ -85,8 +90,13 @@ export default function Metrics() {
                     <td className="px-3 py-3 font-mono font-semibold text-ink">{entry.ticker}</td>
                     <td className="px-3 py-3 text-xs font-mono text-ink-dim">{entry.model ?? '—'}</td>
                     <td className="px-3 py-3 text-right font-mono text-ink">{entry.total_ms ?? '—'}</td>
-                    <td className="px-3 py-3 text-right font-mono text-ink">
-                      {entry.citation_coverage != null ? `${(entry.citation_coverage * 100).toFixed(0)}%` : '—'}
+                    <td className="px-3 py-3 text-right font-mono text-ink whitespace-nowrap">
+                      {entry.citation_coverage != null ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Bar value={entry.citation_coverage} className="w-10" />
+                          {`${(entry.citation_coverage * 100).toFixed(0)}%`}
+                        </span>
+                      ) : '—'}
                     </td>
                     <td className={`px-3 py-3 text-xs font-mono uppercase ${statusColor(status)}`}>
                       {status}
