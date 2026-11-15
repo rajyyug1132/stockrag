@@ -3,7 +3,7 @@
 -- (chunk_index within +-win, same accession and section, hit included,
 -- ordered by char_start) so the API can widen context without a second query.
 --
--- EMBED_DIM: see 20261115120100_chunks.sql.
+-- EMBED_DIM: see 20261115143519_chunks.sql.
 --
 -- SECURITY INVOKER on purpose: with RLS on and no policies only service_role
 -- gets rows. DEFINER would bypass RLS. A new overload gets Supabase's default
