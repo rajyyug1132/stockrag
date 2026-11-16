@@ -20,9 +20,9 @@ import sys
 import time
 
 import httpx
+import tiktoken
 
 from stockrag.config import PROJECT_ROOT, settings
-from stockrag.ingestion.chunk import _ENCODING
 from stockrag.ingestion.parse import parse_filing_sections
 
 BASE = settings.nvidia_base_url.rstrip("/")
@@ -36,6 +36,7 @@ KNOWN = [
 ]
 # cl100k token counts to try, smallest first; stop at the first failure.
 SIZES = [settings.chunk_tokens, 1300, 4000, 8000]
+_ENCODING = tiktoken.get_encoding("cl100k_base")
 PAUSE_S = 1.5  # stay under the free tier's per-minute limit
 RETRY_PAUSE_S = 10.0
 

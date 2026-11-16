@@ -11,8 +11,6 @@ from collections import defaultdict
 
 from langchain_core.documents import Document
 
-from stockrag.rag.retrieve import _ticker_documents
-
 
 def _stitch(chunks: list[tuple[int, int, str]]) -> str:
     """Concatenate section-chunks (sorted by char_start) into one string,
@@ -33,6 +31,9 @@ def expand_docs(docs: list[Document], ticker: str, window: int = 1) -> list[Docu
     same (accession, section). window=0 is a no-op. Metadata is preserved."""
     if window <= 0:
         return docs
+    # Chroma-only (loads the ticker's chunks); imported here so the Supabase
+    # path never pulls in the BM25/langchain.retrievers stack.
+    from stockrag.rag.retrieve import _ticker_documents
 
     # (accession, section) -> chunks sorted by char_start.
     groups: dict[tuple, list[tuple[int, int, str]]] = defaultdict(list)

@@ -6,8 +6,8 @@ from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 
 from stockrag.config import settings
-from stockrag.ingestion.chunk import _ENCODING
-from stockrag.rag.expand import expand_docs
+from stockrag.ingestion.chunk import encoding
+from stockrag.rag.expand import _stitch, expand_docs
 from stockrag.rag.llm import get_llm
 from stockrag.rag.metrics import citation_coverage, estimate_cost_usd, record_request
 from stockrag.rag.prompts import load_prompt
@@ -42,9 +42,16 @@ class AnswerResult:
 
 
 def get_retriever(ticker: str, k: int = DEFAULT_K) -> BaseRetriever:
-    """Hybrid BM25+vector retrieval (RRF fusion) rescored by a local
-    cross-encoder down to the top-k chunks."""
+    """Hybrid keyword+vector retrieval (RRF fusion) rescored by the reranker
+    down to the top-k chunks. Chroma fuses BM25 and vector search in process;
+    Supabase fuses full-text and pgvector search in Postgres."""
     from stockrag.rag.rerank import with_reranker
+
+    if settings.vector_store == "supabase":
+        from stockrag.rag.supabase_store import SupabaseRetriever
+
+        return with_reranker(SupabaseRetriever(ticker=ticker, window=settings.parent_window), top_n=k)
+
     from stockrag.rag.retrieve import get_hybrid_retriever
 
     return with_reranker(get_hybrid_retriever(ticker), top_n=k)
@@ -91,6 +98,16 @@ def _finalize(raw: str, n_sources: int) -> str:
     return answer if CITATION_RE.search(answer) else NO_CONTEXT_MESSAGE
 
 
+def _widen(doc: Document) -> Document:
+    """Doc whose page_content is its neighbours (hit included) stitched in
+    char order; metadata, and so the citation, stays the hit's own."""
+    neighbours = doc.metadata.get("neighbours") or []
+    if not neighbours:
+        return doc
+    parts = sorted((n["char_start"], n["char_end"], n["content"]) for n in neighbours)
+    return Document(page_content=_stitch(parts), metadata=doc.metadata)
+
+
 def _context_docs(docs: list[Document], ticker: str, provider: str) -> list[Document]:
     """Small-to-big: widen each reranked chunk to its section neighbours so
     the LLM sees surrounding context; citations still map to the retrieved
@@ -100,12 +117,17 @@ def _context_docs(docs: list[Document], ticker: str, provider: str) -> list[Docu
     the front — which is where the rules and the question are — so for it the
     context is shrunk to fit: unwidened chunks first, then fewer of them
     (lowest-ranked dropped first)."""
-    expanded = expand_docs(docs, ticker, window=settings.parent_window)
+    if docs and all("neighbours" in d.metadata for d in docs):
+        # Supabase returned each hit's section neighbours with it: stitch them
+        # here instead of loading the whole ticker to find them.
+        expanded = [_widen(d) for d in docs]
+    else:
+        expanded = expand_docs(docs, ticker, window=settings.parent_window)
     if provider != "ollama":
         return expanded
 
     def tokens(ds: list[Document]) -> int:
-        return sum(len(_ENCODING.encode(d.page_content)) for d in ds)
+        return sum(len(encoding().encode(d.page_content)) for d in ds)
 
     budget = settings.ollama_context_tokens
     if tokens(expanded) <= budget:

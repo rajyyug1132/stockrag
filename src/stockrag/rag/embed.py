@@ -104,7 +104,9 @@ class NvidiaEmbeddings(Embeddings):
         return self._embed(texts, "passage")
 
     def embed_query(self, text: str) -> list[float]:
-        return self._embed([text], "query")[0]
+        # A user is waiting: two quick tries, not the ingest budget of ~1 min.
+        quick = type(self)._post.retry_with(stop=stop_after_attempt(2), wait=wait_exponential(max=2))
+        return quick(self, [text], "query")[0]
 
 
 @lru_cache(maxsize=1)
