@@ -65,7 +65,7 @@ export default function Header({ activeView, onViewChange }: HeaderProps) {
           <p className="-mt-3 mb-4 text-xs font-mono text-ink-faint">
             Start it from the repo root:{' '}
             <code className="text-ink-dim">
-              uv run uvicorn stockrag.api.main:app --app-dir src --port 8000 --env-file .env
+              uv run uvicorn stockrag.api.main:app --app-dir src --port 8000
             </code>
           </p>
         )}
