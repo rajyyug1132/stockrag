@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="172" height="32" viewBox="0 0 172 32">
+  <title>StockRAG.ai</title>
+  <style>
+    .ink { fill: #0A0D0C; } .dot { fill: #0F8F62; }
+    @media (prefers-color-scheme: dark) { .ink { fill: #E8EDEB; } .dot { fill: #34E5A0; } }
+  </style>
+  <rect x="0.5" y="0.5" width="31" height="31" rx="7" fill="#0A0D0C" stroke="#1E2825"/>
+  <path d="M10 8H7v16h3M22 8h3v16h-3" fill="none" stroke="#9AA6A2" stroke-width="2.4" stroke-linecap="square"/>
+  <path d="M11 21l4-5 2.5 2.5L21 12" fill="none" stroke="#34E5A0" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="42" y="22" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="18" font-weight="600" class="ink">StockRAG<tspan class="dot">.ai</tspan></text>
+</svg>
