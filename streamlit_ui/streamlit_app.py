@@ -48,6 +48,8 @@ base = st.sidebar.text_input("API URL", value=api_url())
 st.sidebar.caption("FastAPI backend (HF Spaces or local uvicorn).")
 provider = st.sidebar.selectbox("Generation model", ["server default", "nvidia", "gemini", "ollama"])
 st.sidebar.caption("Retrieval always runs on the API host; only generation switches.")
+ingest_token = st.sidebar.text_input("Ingest token", type="password")
+st.sidebar.caption("Sent as X-Ingest-Token; needed when the API sets INGEST_TOKEN.")
 
 ask_tab, factors_tab = st.tabs(["Ask", "Factors"])
 
@@ -59,7 +61,8 @@ with ask_tab:
     if col_ingest.button("Ingest filings first", help="Downloads and indexes this ticker's 10-K (~1 min)"):
         with st.spinner(f"Ingesting {ticker}…"):
             try:
-                r = requests.post(f"{base}/ingest/{ticker}", timeout=TIMEOUT)
+                headers = {"X-Ingest-Token": ingest_token} if ingest_token else {}
+                r = requests.post(f"{base}/ingest/{ticker}", headers=headers, timeout=TIMEOUT)
                 r.raise_for_status()
                 st.success(r.json())
             except requests.RequestException as exc:

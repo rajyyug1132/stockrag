@@ -34,12 +34,15 @@ different problems and refuses to blur them:
 - **Prose answers must cite or die.** 10-K/10-Q text is chunked along Item
   boundaries, retrieved by hybrid BM25 + vector search fused with RRF, then
   rescored by a cross-encoder. If the generated answer contains no `[n]`
-  marker pointing at a retrieved chunk, `rag/answer.py` throws it away and
-  returns a refusal. Sounding right is not a passing grade.
+  marker pointing at a retrieved chunk, `src/stockrag/rag/answer.py` throws it
+  away and returns a refusal. Citations pointing past the retrieved sources are
+  dropped before that check. Sounding right is not a passing grade.
 
 The interesting engineering is in the second bullet. A RAG demo that answers
 every question is easy. One that knows when the filing simply doesn't say is
-what needed the eval harness, and what CI now blocks merges on.
+what needed the eval harness. CI runs a deterministic check of committed
+answers on every merge; [Evaluation & CI gating](#evaluation--ci-gating) says
+what that does and does not cover.
 
 ## What an answer looks like
 
@@ -92,7 +95,7 @@ UNDERLYING EVIDENCE
 
 Those percentages are the point. The briefing tells you which of its own
 sections are well supported by the filing and which are thin, instead of
-presenting all four with equal confidence.
+presenting every section with equal confidence.
 
 ![Thesis briefing for AAPL: summary, bull case and bear case, each point cited back to the filing](docs/thesis.png)
 
@@ -101,7 +104,7 @@ presenting all four with equal confidence.
 ```mermaid
 flowchart TD
     EDGAR["SEC EDGAR<br/>tickers · submissions · Archives · XBRL companyfacts"]
-    YF["yfinance<br/>price · beta · shares"]
+    YF["yfinance<br/>price · beta · momentum"]
     ING["ingestion/<br/>parse → section split → chunk (650/100)"]
     FE["factor_engine/<br/>Piotroski · ratios · factors"]
     EMB["rag/embed<br/>bge-small-en-v1.5 (CPU)"]
@@ -117,36 +120,25 @@ flowchart TD
     FE -->|FactorReport JSON| OUT
 ```
 
-<details>
-<summary>Same pipeline as ASCII</summary>
+In the default local configuration, embeddings, BM25 and the reranker all run
+on CPU, so retrieval costs nothing and works offline. Only generation calls
+out, to NVIDIA NIM (default), Gemini or a local Ollama model, selected per
+request from the server's `LLM_PROVIDERS` allowlist. A hosted configuration
+swaps the store and models; see [Hosted configuration](#hosted-configuration).
 
-```
-              ┌────────────── SEC EDGAR ───────────────┐
-              │ company_tickers.json  (ticker→CIK)     │
-              │ submissions API       (list filings)   │
-              │ Archives              (10-K/10-Q HTML) │
-              │ xbrl/companyfacts     (structured nums)│
-              └───────┬───────────────────┬────────────┘
-                      │ HTML docs         │ XBRL JSON      yfinance
-                      v                   v                   │
-           ingestion/ (parse→section→chunk)   factor_engine/ <┘
-                      │                             │
-        rag/embed (bge-small-en-v1.5)               │
-                      v                             v
-     ChromaDB (persistent) + BM25 ─RRF─> rerank (ms-marco-MiniLM-L-6-v2)
-                      │                             │
-                      v                             v
-     rag/answer (Ollama local / Gemini API)    FactorReport JSON
-                      │                             │
-        FastAPI: POST /ask, POST /ingest/{ticker}, GET /factors/{ticker}
-        CLI (typer): stockrag ingest | ask | factors | retrieve | stats
-```
+### Tech stack
 
-</details>
-
-Embeddings, BM25 and the reranker all run on CPU, so retrieval costs nothing
-and works offline. Only generation calls out, to NVIDIA NIM (default), Gemini
-or a local Ollama model, switchable per request.
+| Layer | Default (local) | Hosted |
+| --- | --- | --- |
+| Orchestration | LangChain components, plain Python pipeline | same |
+| Embeddings | `bge-small-en-v1.5` on CPU | NVIDIA NIM `nemotron-3.5-embed-1b` (1024-d) |
+| Vector store | ChromaDB + BM25, fused with RRF | Supabase Postgres (pgvector + full-text) |
+| Reranker | `ms-marco-MiniLM-L-6-v2` cross-encoder | NIM reranker, local fallback |
+| LLM | NVIDIA NIM (`minimax-m3.1-flash`); Gemini or Ollama selectable | same |
+| Financial data | SEC EDGAR XBRL `companyfacts`, yfinance | same |
+| Serving | FastAPI, Typer CLI, React + Vite, Streamlit | HF Space / Vercel / Streamlit Cloud |
+| Evaluation | Ragas + deterministic gates, GitHub Actions | same |
+| Tracing | Langfuse (optional) | same |
 
 ## Setup
 
@@ -155,7 +147,15 @@ no torch/chromadb wheels yet).
 
 ```powershell
 uv sync
-copy .env.example .env   # fill NVIDIA_API_KEY (or GEMINI_API_KEY; optional Langfuse keys)
+copy .env.example .env   # fill NVIDIA_API_KEY (or GEMINI_API_KEY) and SEC_USER_AGENT
+```
+
+To try the pipeline without touching EDGAR, ingest the sample 10-K excerpt that
+CI uses (`tests/fixtures/aapl_10k_excerpt.html`) and ask about it:
+
+```powershell
+uv run stockrag ingest-file tests/fixtures/aapl_10k_excerpt.html AAPL
+uv run stockrag ask "What are the main risk factors?" AAPL
 ```
 
 Optional local LLM: install [Ollama](https://ollama.com) and
@@ -182,6 +182,16 @@ uv run stockrag stats
 uv run uvicorn stockrag.api.main:app --app-dir src
 ```
 
+CLI commands: `stockrag ingest | ingest-file | ask | factors | retrieve | stats | health`.
+API routes: `POST /ask`, `POST /ask/stream` (SSE), `GET /thesis/{ticker}`,
+`GET /factors/{ticker}`, `POST /ingest/{ticker}` (`forms` and `years` query
+parameters), `POST /ingest-pdf`, `GET /metrics`, `GET /health`, and a custom
+`GET /docs`.
+
+`ingest-file` and `POST /ingest-pdf` ingest a local document such as an Indian
+annual-report PDF (form `annual-report`). Uploads over `MAX_UPLOAD_MB`
+(default 20) get a 413.
+
 ## Web UI
 
 React + Vite frontend over the same API. Four views: **Ask** (cited Q&A over
@@ -205,9 +215,11 @@ means it can't. In that case the header shows the command for terminal 1.
 Vite proxies `/api` to `localhost:8000` in dev. Set `VITE_API_URL` (see
 `frontend/.env.example`) only to point the UI at a non-proxied or deployed API.
 
-Backend errors reach the UI as text. A 404 or 403 shows FastAPI's `detail`
-message, and a failure mid-stream on Ask (bad key, empty index, model error)
-arrives as an `{"error": ...}` SSE event instead of a silently closed stream.
+Backend errors reach the UI as text. A 403, 404, 422 (unsupported `llm`) or 429
+(rate limit) shows FastAPI's `detail` message, and a failure mid-stream on Ask
+arrives as an `{"error": "Answer generation failed."}` SSE event instead of a
+silently closed stream. An empty index is not an error: Ask returns the normal
+no-context refusal.
 
 There is a second, deliberately minimal Streamlit client in `streamlit_ui/`.
 It speaks HTTP only, so it deploys to Streamlit Cloud without dragging torch
@@ -223,14 +235,29 @@ Three pieces, three free hosts:
 
 | Piece | Host | Notes |
 | --- | --- | --- |
-| FastAPI backend | Hugging Face Spaces | `Dockerfile` + `app.py` are the entrypoint; set `NVIDIA_API_KEY` as a Space secret. Retrieval models (~150MB) download on first boot. |
-| React frontend | Vercel | Root directory `frontend`, build `npm run build`, output `dist`. Set `VITE_API_URL` to the Space URL. |
+| FastAPI backend | Hugging Face Spaces | The front matter selects the free Gradio SDK, which only runs `app.py`; `app.py` starts uvicorn, so it is the entrypoint. The `Dockerfile` builds the same app for the Docker SDK or any container host. Set `NVIDIA_API_KEY` as a Space secret and `CORS_ORIGINS` to the frontend origin (the default allows only `localhost:5173`). Retrieval models (~150MB) download on first boot. |
+| React frontend | Vercel | Keep the Vercel root directory at the repo root: `vercel.json` there builds `frontend` (`npm ci --prefix frontend`, output `frontend/dist`). Set `VITE_API_URL` to the Space URL. |
 | Streamlit client | Streamlit Cloud | Entrypoint `streamlit_ui/streamlit_app.py`. Set `STOCKRAG_API_URL` in app secrets. |
 
 The Space starts with an empty vector store because free-tier storage is
-ephemeral. Ingest a ticker once after boot (`POST /ingest/AAPL`, or the button
-in either UI) and it stays indexed until the Space sleeps. Set `INGEST_TOKEN`
-on the Space if you'd rather strangers not spend your EDGAR quota.
+ephemeral. Ingest a ticker once after boot (`POST /ingest/AAPL`, or the Ingest
+button in the React UI), or set `AUTO_INGEST_TICKERS` to ingest at startup. It
+stays indexed until the Space sleeps.
+
+`INGEST_TOKEN` (sent as an `X-Ingest-Token` header) guards `POST /ingest/{ticker}`,
+`POST /ingest-pdf` and `GET /metrics`, so strangers can't spend your EDGAR
+quota. With no token those routes stay closed (503); set `ALLOW_OPEN_INGEST=true`
+to open them for local development. Use 32+ random characters, since failed
+attempts are not rate-limited. Both web clients take the token in the UI
+(React on its Ingest and Metrics pages, Streamlit in the sidebar). The CLI is
+not affected.
+
+Other server settings: `RATE_LIMIT_PER_MINUTE` (default 20 per IP on `/ask`,
+`/ask/stream`, `/thesis` and `/factors`; in memory, per instance; 429 with
+`Retry-After`) and `CLIENT_IP_HEADER` (behind a proxy such as a Space, all
+clients share one rate-limit bucket until it is set; only name a header the
+host overwrites). `THESIS_MAX_CONCURRENT` (default 2) caps how many thesis runs
+execute at once.
 
 ![Factor report for AAPL: Piotroski F-Score ring at 9/9, the nine accounting signals, and the metric table](docs/factors.png)
 
@@ -238,19 +265,50 @@ Every number there came from XBRL or yfinance. The one failing F-Score signal
 is operating cash flow below net income, and the report says so rather than
 rounding 8/9 up to a clean story.
 
+### Hosted configuration
+
+The default setup keeps everything local (Chroma, bge, cross-encoder). The repo
+also contains a hosted configuration:
+
+- **Vector store:** `VECTOR_STORE=supabase` keeps chunks in Supabase Postgres
+  (pgvector `vector(1024)` plus full-text search, queried through a
+  `hybrid_search` RPC). The schema and the `request_metrics`, `thesis_cache` and
+  `ticker_accessions` tables are in `supabase/migrations/`. Set `SUPABASE_URL`
+  and `SUPABASE_SERVICE_KEY`.
+- **Models:** it requires hosted embeddings (`EMBEDDING_PROVIDER=nvidia`,
+  `NVIDIA_EMBED_MODEL`, `NVIDIA_EMBED_DIM=1024`). `RERANKER_PROVIDER` can use the
+  NIM reranker, falling back to the local cross-encoder. An index only works
+  with the embedder that built it.
+- **API:** `api/index.py`, with its own slim `api/pyproject.toml`, is a Vercel
+  serverless entrypoint for the API (`DATA_DIR=/tmp/stockrag`).
+- **Scheduled ingest:** `.github/workflows/ingest.yml` ingests AAPL, MSFT and
+  NVDA into Supabase every Monday at 06:17 UTC and can be run by hand with a
+  ticker input. It needs the `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
+  `NVIDIA_API_KEY` and `SEC_USER_AGENT` repo secrets, and the weekly run keeps the free Supabase
+  project from pausing.
+
 ## Observability
 
 - **Tracing (Langfuse)** — set `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`
-  in `.env` and every request traces retriever, reranker, prompt, and LLM
-  spans to [Langfuse Cloud](https://cloud.langfuse.com). Without keys,
-  tracing is a silent no-op.
-- **Metrics** — every `ask()` appends a JSONL record (stage latencies,
-  token usage, cost estimate, citation coverage, refusal/error flags) to
-  `data/metrics/requests.jsonl`; `stockrag stats` reports P50/P95 latency,
-  refusal/error rates, and cost per request.
-- **Versioning** — prompts live in `src/stockrag/prompts/v*.yaml` and every response
+  in `.env` (they are not in `.env.example`; add `LANGFUSE_HOST` for a
+  non-default host) and `/ask` traces retriever, reranker, prompt, and LLM
+  spans to [Langfuse Cloud](https://cloud.langfuse.com). `/factors` is not
+  traced and the thesis synthesis call has no tracing callbacks yet. Without
+  keys, tracing is a silent no-op.
+- **Metrics** — every `ask()` records stage latencies (`retrieval_ms`, which
+  includes reranking, and `llm_ms`), citation coverage and refusal/error flags
+  to `requests.jsonl` under `DATA_DIR/metrics/`, or to the `request_metrics`
+  table with `VECTOR_STORE=supabase` (reads capped at 5000 rows). Token usage
+  and cost are recorded for `ask()` only, not `ask_stream()` (which the React
+  Ask view uses), and `MODEL_PRICES` in `src/stockrag/rag/metrics.py` prices
+  only the Gemini 2.5 flash models, so cost shows 0 for the default NIM and Gemini models.
+  `stockrag stats` reports P50/P95 latency, refusal/error rates, and cost per
+  request.
+- **Versioning** — prompts live in `src/stockrag/prompts/v*.yaml` (`v3` is the
+  active QA prompt) plus `thesis_v1.yaml` for the thesis, and every response
   echoes its `prompt_version`, so eval results trace back to exact prompt
-  configs.
+  configs. Thesis results are cached per ticker, keyed by the ingested
+  accessions and the prompt version.
 
 ## Evaluation & CI gating
 
@@ -262,14 +320,24 @@ two locally computed gates: **citation coverage** (groundedness proxy) and
 **refusal accuracy** on deliberately unanswerable questions.
 
 ```powershell
+# live generation + Ragas judge: needs the provider's API key (NVIDIA_API_KEY by
+# default) and AAPL ingested first, otherwise it exits with code 2
 uv run python eval/run_eval.py --subset smoke            # 8 questions
 uv run python eval/run_eval.py --subset golden           # full set
 uv run python eval/run_eval.py --subset smoke --limit 3  # quota-constrained
+
+# what CI runs: score the committed fixture offline, no judge, no keys
+uv run python eval/run_eval.py --subset smoke --frozen eval/fixtures/smoke_answers.json --no-judge
+# regenerate the fixture after pipeline changes that alter answers (repo root)
+uv run python eval/run_eval.py --subset smoke --freeze eval/fixtures/smoke_answers.json
 ```
 
-The build fails when any gated metric drops below threshold (faithfulness
-≥ 0.75, relevancy ≥ 0.60, precision ≥ 0.60, citation coverage ≥ 0.60,
-refusal accuracy ≥ 0.50).
+`--llm` and `--sleep` are also available; see `--help`.
+
+The build fails when a gated metric drops below its threshold: citation
+coverage ≥ 0.60 or refusal accuracy ≥ 0.50. The Ragas metrics (faithfulness,
+answer relevancy, context precision and recall) are advisory and never fail
+the build.
 
 Latest smoke run (8 questions, frozen answer fixture, deterministic gates):
 
@@ -284,23 +352,31 @@ gates the merge on the smoke eval. The gate is fully offline — it scores a
 committed answer fixture with deterministic metrics only, no API keys. Live
 generation on free shared endpoints proved non-reproducible (faithfulness
 swinging 0.86 → 0.375 on identical inputs), so judge metrics stay advisory
-and are run locally.
+and are run locally. The trade-off: the gate checks the committed answers, not
+the live pipeline, so a change to retrieval, prompts or the model cannot fail
+it until the fixture is regenerated. The CI ingest step is a separate
+integration check on the fixture filing.
 
 ## Design decisions
 
 - **XBRL over LLM extraction** for financial numbers: deterministic, free,
   multi-year history; the only real work is the priority-ordered tag
-  fallback map in `edgar/companyfacts.py`.
+  fallback map in `src/stockrag/edgar/companyfacts.py`.
 - **Section-aware chunking** (650 tokens, 100 overlap, never crossing an
   Item boundary) keeps citations attributable to Item 1A / Item 7 / etc.
-- **Local-first retrieval** (bge-small + ms-marco reranker on CPU): zero
-  cost and offline; only generation calls out.
+- **Local-first retrieval** (bge-small + ms-marco reranker on CPU, in the
+  default configuration): zero cost and offline; only generation calls out.
 - **EDGAR etiquette**: descriptive User-Agent with contact email, ≤8 req/s
-  throttle, aggressive disk caching, and no EDGAR traffic from CI.
+  throttle, aggressive disk caching, and no EDGAR traffic from CI. Cached
+  submissions, companyfacts and ticker files never expire, so new filings and
+  fiscal years appear only after you clear `data/`.
 
 ## Tests
 
 ```powershell
-uv run pytest -q          # 25 unit tests: chunking, parsing, XBRL, Piotroski, ratios
+uv run pytest -q          # chunking, parsing, XBRL, Piotroski, ratios, API security, streaming, Supabase store, migrations
 uv run ruff check src tests eval streamlit_ui
 ```
+
+The migration tests run against a throwaway Postgres with pgvector (`pgserver`,
+in the default dev group).
