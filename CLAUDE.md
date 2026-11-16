@@ -23,7 +23,7 @@
 
 ## Environment
 - Windows; use `python`, never `python3` (Microsoft Store stub, exit 49).
-- `.env` lives only in the repo root (`D:\personal project RAG\.env`), never in
+- `.env` lives only in the repo root (`C:\YYUG\STOCK RAG\.env`), never in
   worktrees and never committed. Run eval/API-key-dependent commands from the repo
   root, not a worktree. Copying `.env` into a worktree is blocked by policy.
 - Requires `uv` (Python 3.12 pinned); run everything via `uv run`.

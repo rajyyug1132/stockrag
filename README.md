@@ -248,7 +248,7 @@ rounding 8/9 up to a clean story.
   token usage, cost estimate, citation coverage, refusal/error flags) to
   `data/metrics/requests.jsonl`; `stockrag stats` reports P50/P95 latency,
   refusal/error rates, and cost per request.
-- **Versioning** — prompts live in `prompts/v*.yaml` and every response
+- **Versioning** — prompts live in `src/stockrag/prompts/v*.yaml` and every response
   echoes its `prompt_version`, so eval results trace back to exact prompt
   configs.
 

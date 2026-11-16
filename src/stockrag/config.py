@@ -16,11 +16,23 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://cloud.langfuse.com"
 
+    # Everything written at runtime lives under data_dir; on a read-only
+    # serverless filesystem set DATA_DIR to a writable temp dir (/tmp/stockrag).
     data_dir: Path = PROJECT_ROOT / "data"
-    filings_dir: Path = PROJECT_ROOT / "data" / "filings"
-    facts_dir: Path = PROJECT_ROOT / "data" / "facts"
-    chroma_dir: Path = PROJECT_ROOT / "data" / "chroma"
-    prompts_dir: Path = PROJECT_ROOT / "prompts"
+    # Inside the package so a non-editable install (the Vercel API) ships them.
+    prompts_dir: Path = Path(__file__).parent / "prompts"
+
+    @property
+    def filings_dir(self) -> Path:
+        return self.data_dir / "filings"
+
+    @property
+    def facts_dir(self) -> Path:
+        return self.data_dir / "facts"
+
+    @property
+    def chroma_dir(self) -> Path:
+        return self.data_dir / "chroma"
 
     # Retrieval backend: "chroma" (local disk + in-process BM25, the default
     # for dev, Ollama and CI) or "supabase" (pgvector + Postgres full-text,
@@ -95,6 +107,21 @@ class Settings(BaseSettings):
     # Comma-separated tickers (e.g. "AAPL,MSFT") ingested in a background thread
     # at API startup — for hosts with an ephemeral disk. Empty (default) = off.
     auto_ingest_tickers: str = ""
+
+    # Public-API hardening. Requests per client IP per minute on /ask,
+    # /ask/stream, /thesis and /factors; 0 turns the limit off.
+    rate_limit_per_minute: int = 20
+    # Header holding the client IP. Set it only to a header the host's proxy
+    # overwrites: "x-real-ip" on Vercel. Empty = the TCP peer address, which
+    # behind an appending proxy (the HF Space) is the proxy itself, so all
+    # clients share one bucket — coarse, but never spoofable.
+    client_ip_header: str = ""
+    # Comma-separated browser origins allowed by CORS. Local dev goes through
+    # the Vite /api proxy (same origin); production lists the Vercel site.
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    # Providers a request's `llm` field may pick. Production: "nvidia".
+    llm_providers: str = "nvidia,gemini,ollama"
+    max_upload_mb: int = 20
 
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.filings_dir, self.facts_dir, self.chroma_dir):
