@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Path, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from stockrag.api.docs import DOCS_HTML
 from stockrag.config import settings
@@ -78,14 +78,6 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="StockRAG", docs_url=None, lifespan=lifespan)
 
-# Frontend is deployed on a different origin (Vercel) than the API.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
-    allow_methods=["GET", "POST"],
-    allow_headers=["*"],
-)
-
 
 Ticker = Path(pattern=TICKER_PATTERN)
 
@@ -102,7 +94,10 @@ def rate_limit(request: Request) -> None:
     if limit <= 0:
         return
     header = settings.client_ip_header
-    ip = request.headers.get(header, "").split(",")[0].strip() if header else ""
+    # Rightmost entry: the one the host's proxy appended. Leftmost entries of
+    # an appended X-Forwarded-For are whatever the client sent.
+    # getlist: a proxy may add its own header line rather than append.
+    ip = ",".join(request.headers.getlist(header)).split(",")[-1].strip() if header else ""
     ip = ip or (request.client.host if request.client else "unknown")
     now = time.monotonic()
     with _hits_lock:
@@ -123,12 +118,53 @@ def rate_limit(request: Request) -> None:
 def require_ingest_token(x_ingest_token: str = Header(default="")) -> None:
     expected = settings.ingest_token
     if not expected:
-        # Open only for local dev; the public Supabase deployment fails closed.
-        if settings.vector_store == "supabase":
+        # Fail closed unless explicitly opened for local dev: a typo in some
+        # other setting must never make ingest public.
+        if not settings.allow_open_ingest:
             raise HTTPException(status_code=503, detail="Ingest is disabled: INGEST_TOKEN is not set.")
         return
     if not secrets.compare_digest(x_ingest_token.encode(), expected.encode()):
         raise HTTPException(status_code=403, detail="Invalid or missing X-Ingest-Token header.")
+
+
+SMALL_BODY_BYTES = 64 * 1024  # /ask JSON is a 1000-char question
+
+
+@app.middleware("http")
+async def guard_body(request: Request, call_next):
+    """Runs before FastAPI reads the body, so oversized, length-less or
+    unauthenticated bodies are refused before they are buffered or spooled."""
+    if request.method == "POST":
+        is_ingest = request.url.path.startswith("/ingest")
+        if "chunked" in request.headers.get("transfer-encoding", "").lower():
+            # Size unknown until fully read; every client we serve sends a length.
+            return JSONResponse({"detail": "Content-Length required."}, status_code=411)
+        length = request.headers.get("content-length", "0")  # absent = no body
+        if not length.isdigit():
+            return JSONResponse({"detail": "Invalid Content-Length."}, status_code=400)
+        cap = (settings.max_upload_mb + 1) * 1024 * 1024 if is_ingest else SMALL_BODY_BYTES
+        if int(length) > cap:
+            return JSONResponse({"detail": "Request body too large."}, status_code=413)
+        if is_ingest:
+            try:
+                rate_limit(request)  # throttles token guessing too
+                require_ingest_token(request.headers.get("x-ingest-token", ""))
+            except HTTPException as exc:
+                return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
+    return await call_next(request)
+
+
+# Added after the guard so it wraps it: the guard's 4xx responses still carry
+# CORS headers and the browser sees the real status. Frontend is on Vercel.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+
+_thesis_slots = threading.BoundedSemaphore(max(1, settings.thesis_max_concurrent))
 
 
 def _check_llm(llm: str | None) -> None:
@@ -147,7 +183,7 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/metrics", dependencies=[Depends(require_ingest_token)])
+@app.get("/metrics", dependencies=[Depends(rate_limit), Depends(require_ingest_token)])
 def get_metrics() -> list[dict]:
     """Recorded ask() requests, newest first (backs the frontend Metrics view)."""
     return metrics_rows()
@@ -198,10 +234,14 @@ def get_thesis(ticker: str = Ticker, llm: str | None = None) -> ThesisResponse:
     """Evidence briefing: factor report + filing evidence, synthesized.
     Slow (several LLM calls); ingest the ticker first."""
     _check_llm(llm)
+    if not _thesis_slots.acquire(blocking=False):
+        raise HTTPException(429, "Thesis capacity busy, retry shortly.", headers={"Retry-After": "30"})
     try:
         result = build_thesis(ticker, llm_provider=llm)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="Unknown ticker.") from exc
+    finally:
+        _thesis_slots.release()
     return ThesisResponse(
         ticker=result.ticker,
         synthesis=result.synthesis,
