@@ -1,8 +1,11 @@
-from dataclasses import dataclass
+from __future__ import annotations
 
-import numpy as np
-import pandas as pd
-import yfinance as yf
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+# pandas + yfinance cost ~1.8s of a ~3.9s cold import; load them on first use.
+if TYPE_CHECKING:
+    import pandas as pd
 
 BENCHMARK_TICKER = "^GSPC"
 
@@ -16,6 +19,9 @@ class MarketData:
 
 
 def _beta(stock_weekly: pd.Series, bench_weekly: pd.Series) -> float | None:
+    import numpy as np
+    import pandas as pd
+
     merged = pd.DataFrame({"stock": stock_weekly, "bench": bench_weekly}).dropna()
     returns = merged.pct_change().dropna()
     if len(returns) < 20:
@@ -29,6 +35,8 @@ def _beta(stock_weekly: pd.Series, bench_weekly: pd.Series) -> float | None:
 def _momentum_12_1(daily_close: pd.Series) -> float | None:
     if daily_close.empty:
         return None
+    import pandas as pd
+
     last_date = daily_close.index[-1]
     end_cutoff = last_date - pd.DateOffset(months=1)
     start_cutoff = last_date - pd.DateOffset(months=12)
@@ -50,6 +58,8 @@ def get_market_data(ticker: str, shares_outstanding: float | None) -> MarketData
     to the XBRL-derived fundamentals.
     """
     try:
+        import yfinance as yf
+
         stock_weekly = yf.Ticker(ticker).history(period="2y", interval="1wk", auto_adjust=True)["Close"]
         bench_weekly = yf.Ticker(BENCHMARK_TICKER).history(period="2y", interval="1wk", auto_adjust=True)["Close"]
         daily = yf.Ticker(ticker).history(period="14mo", interval="1d", auto_adjust=True)["Close"]

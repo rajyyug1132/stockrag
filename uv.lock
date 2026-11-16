@@ -2289,14 +2289,11 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
-    { name = "chromadb" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "langchain" },
-    { name = "langchain-chroma" },
     { name = "langchain-community" },
     { name = "langchain-google-genai" },
-    { name = "langchain-huggingface" },
     { name = "langchain-ollama" },
     { name = "langchain-openai" },
     { name = "langfuse" },
@@ -2308,12 +2305,8 @@ dependencies = [
     { name = "pypdf" },
     { name = "python-multipart" },
     { name = "pyyaml" },
-    { name = "rank-bm25" },
-    { name = "sentence-transformers" },
     { name = "tenacity" },
     { name = "tiktoken" },
-    { name = "torch", version = "2.12.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
-    { name = "torch", version = "2.12.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
     { name = "typer" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "yfinance" },
@@ -2326,18 +2319,24 @@ dev = [
     { name = "ragas" },
     { name = "ruff" },
 ]
+local = [
+    { name = "chromadb" },
+    { name = "langchain-chroma" },
+    { name = "langchain-huggingface" },
+    { name = "rank-bm25" },
+    { name = "sentence-transformers" },
+    { name = "torch", version = "2.12.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
+    { name = "torch", version = "2.12.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = "~=4.12" },
-    { name = "chromadb", specifier = "~=0.6" },
     { name = "fastapi", specifier = "~=0.115" },
     { name = "httpx", specifier = "~=0.28" },
     { name = "langchain", specifier = "~=0.3" },
-    { name = "langchain-chroma", specifier = "~=0.2" },
     { name = "langchain-community", specifier = "~=0.3" },
     { name = "langchain-google-genai", specifier = "~=2.0" },
-    { name = "langchain-huggingface", specifier = "~=0.1" },
     { name = "langchain-ollama", specifier = "~=0.2" },
     { name = "langchain-openai", specifier = "~=0.3" },
     { name = "langfuse", specifier = ">=4.13.0" },
@@ -2349,11 +2348,8 @@ requires-dist = [
     { name = "pypdf", specifier = "~=5.1" },
     { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "pyyaml", specifier = "~=6.0" },
-    { name = "rank-bm25", specifier = "~=0.2" },
-    { name = "sentence-transformers", specifier = "~=3.3" },
     { name = "tenacity", specifier = "~=9.0" },
     { name = "tiktoken", specifier = "~=0.8" },
-    { name = "torch", specifier = "~=2.5", index = "https://download.pytorch.org/whl/cpu" },
     { name = "typer", specifier = "~=0.15" },
     { name = "uvicorn", extras = ["standard"], specifier = "~=0.34" },
     { name = "yfinance", specifier = "~=0.2" },
@@ -2365,6 +2361,14 @@ dev = [
     { name = "pytest", specifier = "~=8.3" },
     { name = "ragas", specifier = "~=0.2" },
     { name = "ruff", specifier = "~=0.8" },
+]
+local = [
+    { name = "chromadb", specifier = "~=0.6" },
+    { name = "langchain-chroma", specifier = "~=0.2" },
+    { name = "langchain-huggingface", specifier = "~=0.1" },
+    { name = "rank-bm25", specifier = "~=0.2" },
+    { name = "sentence-transformers", specifier = "~=3.3" },
+    { name = "torch", specifier = "~=2.5", index = "https://download.pytorch.org/whl/cpu" },
 ]
 
 [[package]]
