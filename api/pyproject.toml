@@ -1,0 +1,14 @@
+# Vercel API project (Root Directory = api). Depends on the repo's package
+# without its dependency groups, so the slim set installs (no torch/chroma).
+# After changing ../pyproject.toml run: uv lock --directory api
+[project]
+name = "stockrag-api"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = ["stockrag"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+stockrag = { path = "..", editable = false }
