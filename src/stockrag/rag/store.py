@@ -8,7 +8,6 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Protocol
 
 from stockrag.config import settings
-from stockrag.rag.embed import get_embeddings
 
 if TYPE_CHECKING:
     from langchain_chroma import Chroma
@@ -30,6 +29,8 @@ class ChunkStore(Protocol):
 def get_vector_store() -> "Chroma":
     import chromadb
     from langchain_chroma import Chroma
+
+    from stockrag.rag.embed import get_embeddings
 
     client = chromadb.PersistentClient(path=str(settings.chroma_dir))
     return Chroma(
@@ -61,5 +62,7 @@ def get_store() -> ChunkStore:
     if settings.vector_store == "chroma":
         return ChromaStore(get_vector_store())
     if settings.vector_store == "supabase":
-        raise NotImplementedError("VECTOR_STORE=supabase lands in a later change")
+        from stockrag.rag.supabase_store import SupabaseStore
+
+        return SupabaseStore()
     raise ValueError(f"VECTOR_STORE must be 'chroma' or 'supabase', got {settings.vector_store!r}")
