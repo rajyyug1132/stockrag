@@ -1,25 +1,35 @@
 import { useState, useEffect } from 'react'
-import { getMetrics, type MetricsEntry } from '../lib/api'
+import { getMetrics, loadIngestToken, saveIngestToken, type MetricsEntry } from '../lib/api'
 import { Bar, CountUp } from '../components/motion'
 
 export default function Metrics() {
   const [entries, setEntries] = useState<MetricsEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [token, setToken] = useState(loadIngestToken)
+  const [submitted, setSubmitted] = useState(token)
 
   useEffect(() => {
     const fetchMetrics = async () => {
+      setLoading(true)
+      setError('')
       try {
-        const data = await getMetrics()
-        setEntries(data)
+        setEntries(await getMetrics(submitted || undefined))
       } catch (err) {
+        setEntries([])
         setError(err instanceof Error ? err.message : 'Failed to load metrics')
       } finally {
         setLoading(false)
       }
     }
     fetchMetrics()
-  }, [])
+  }, [submitted])
+
+  const unlock = (e: React.FormEvent) => {
+    e.preventDefault()
+    saveIngestToken(token)
+    setSubmitted(token)
+  }
 
   const latencies = entries.filter(e => e.total_ms != null).map(e => e.total_ms as number)
   const stats = {
@@ -38,6 +48,18 @@ export default function Metrics() {
 
   return (
     <div className="flex flex-col gap-8">
+      <form onSubmit={unlock} className="flex items-center gap-2">
+        <input
+          type="password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="ingest token (required on the public API)"
+          aria-label="Ingest token"
+          className="text-xs w-64"
+        />
+        <button type="submit" className="text-xs">Load metrics</button>
+      </form>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-line border border-line">
         {[
           { label: 'Total Queries', value: stats.totalQueries, format: (n: number) => n.toFixed(0) },
