@@ -48,7 +48,7 @@ jobs:
         run: uv run python eval/run_eval.py --subset smoke --frozen eval/fixtures/smoke_answers.json --no-judge
       - name: Upload eval results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: eval-results
           path: eval/results/
