@@ -1,11 +1,14 @@
 import json
 import logging
 import os
+import secrets
 import tempfile
 import threading
+import time
+from collections import deque
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Path, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 
@@ -14,6 +17,7 @@ from stockrag.config import settings
 from stockrag.api.schemas import (
     AskRequest,
     AskResponse,
+    TICKER_PATTERN,
     IngestResponse,
     SourceOut,
     ThesisResponse,
@@ -74,13 +78,63 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="StockRAG", docs_url=None, lifespan=lifespan)
 
-# Frontend is deployed on a different origin (Vercel) than the API (HF Spaces).
+# Frontend is deployed on a different origin (Vercel) than the API.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+
+Ticker = Path(pattern=TICKER_PATTERN)
+
+# ponytail: in-memory window is per instance — serverless instances and
+# restarts don't share it, so the real ceiling is limit x instances. Upgrade
+# path: a shared counter (Upstash Redis, or a Postgres table in Supabase).
+_hits: dict[str, deque[float]] = {}
+_hits_lock = threading.Lock()
+
+
+def rate_limit(request: Request) -> None:
+    """Sliding 60s window per client IP; 429 + Retry-After when exceeded."""
+    limit = settings.rate_limit_per_minute
+    if limit <= 0:
+        return
+    header = settings.client_ip_header
+    ip = request.headers.get(header, "").split(",")[0].strip() if header else ""
+    ip = ip or (request.client.host if request.client else "unknown")
+    now = time.monotonic()
+    with _hits_lock:
+        # ponytail: crude memory bound — 10k distinct IPs in a window resets
+        # every bucket at once. IPv6 isn't grouped by /64 either; both go away
+        # with the shared-counter upgrade above.
+        if len(_hits) >= 10_000:
+            _hits.clear()
+        q = _hits.setdefault(ip, deque())
+        while q and now - q[0] >= 60:
+            q.popleft()
+        if len(q) >= limit:
+            retry_after = int(60 - (now - q[0])) + 1
+            raise HTTPException(429, "Rate limit exceeded.", headers={"Retry-After": str(retry_after)})
+        q.append(now)
+
+
+def require_ingest_token(x_ingest_token: str = Header(default="")) -> None:
+    expected = settings.ingest_token
+    if not expected:
+        # Open only for local dev; the public Supabase deployment fails closed.
+        if settings.vector_store == "supabase":
+            raise HTTPException(status_code=503, detail="Ingest is disabled: INGEST_TOKEN is not set.")
+        return
+    if not secrets.compare_digest(x_ingest_token.encode(), expected.encode()):
+        raise HTTPException(status_code=403, detail="Invalid or missing X-Ingest-Token header.")
+
+
+def _check_llm(llm: str | None) -> None:
+    allowed = {p.strip() for p in settings.llm_providers.split(",") if p.strip()}
+    if llm and llm not in allowed:
+        raise HTTPException(status_code=422, detail=f"llm must be one of: {', '.join(sorted(allowed))}.")
 
 
 @app.get("/docs", include_in_schema=False)
@@ -93,7 +147,7 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/metrics")
+@app.get("/metrics", dependencies=[Depends(require_ingest_token)])
 def get_metrics() -> list[dict]:
     """Recorded ask() requests, newest first (backs the frontend Metrics view)."""
     path = metrics_path()
@@ -103,47 +157,38 @@ def get_metrics() -> list[dict]:
     return rows[::-1]
 
 
-@app.get("/factors/{ticker}")
-def get_factors(ticker: str) -> FactorReport:
+@app.get("/factors/{ticker}", dependencies=[Depends(rate_limit)])
+def get_factors(ticker: str = Ticker) -> FactorReport:
     try:
         return build_factor_report(ticker)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=404, detail="Unknown ticker.") from exc
 
 
-def _check_ingest_token(token: str) -> None:
-    if settings.ingest_token and token != settings.ingest_token:
-        raise HTTPException(status_code=403, detail="Invalid or missing X-Ingest-Token header.")
-
-
-@app.post("/ingest/{ticker}")
-def ingest(
-    ticker: str,
-    forms: str = "10-K",
-    years: int = 2,
-    x_ingest_token: str = Header(default=""),
-) -> IngestResponse:
-    _check_ingest_token(x_ingest_token)
+@app.post("/ingest/{ticker}", dependencies=[Depends(require_ingest_token)])
+def ingest(ticker: str = Ticker, forms: str = "10-K", years: int = 2) -> IngestResponse:
     form_tuple = tuple(f.strip() for f in forms.split(","))
     try:
         result = ingest_ticker(ticker, forms=form_tuple, years=years)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=404, detail="Unknown ticker.") from exc
     return IngestResponse(ticker=ticker.upper(), **result.__dict__)
 
 
-@app.post("/ingest-pdf")
+@app.post("/ingest-pdf", dependencies=[Depends(require_ingest_token)])
 def ingest_pdf_endpoint(
-    ticker: str = Form(...),
-    filing_date: str = Form(default=""),
+    ticker: str = Form(..., pattern=TICKER_PATTERN),
+    filing_date: str = Form(default="", pattern=r"^(\d{4}-\d{2}-\d{2})?$"),
     file: UploadFile = File(...),
-    x_ingest_token: str = Header(default=""),
 ) -> IngestResponse:
     """Ingest an uploaded Indian annual-report PDF (deployed Space has no
     local files to point ingest_pdf at)."""
-    _check_ingest_token(x_ingest_token)
+    max_bytes = settings.max_upload_mb * 1024 * 1024
+    data = file.file.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"PDF larger than {settings.max_upload_mb} MB.")
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(file.file.read())
+        tmp.write(data)
         tmp_path = tmp.name
     try:
         result = ingest_pdf(tmp_path, ticker, filing_date=filing_date)
@@ -152,14 +197,15 @@ def ingest_pdf_endpoint(
     return IngestResponse(ticker=ticker.upper(), **result.__dict__)
 
 
-@app.get("/thesis/{ticker}")
-def get_thesis(ticker: str, llm: str | None = None) -> ThesisResponse:
+@app.get("/thesis/{ticker}", dependencies=[Depends(rate_limit)])
+def get_thesis(ticker: str = Ticker, llm: str | None = None) -> ThesisResponse:
     """Evidence briefing: factor report + filing evidence, synthesized.
     Slow (several LLM calls); ingest the ticker first."""
+    _check_llm(llm)
     try:
         result = build_thesis(ticker, llm_provider=llm)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=404, detail="Unknown ticker.") from exc
     return ThesisResponse(
         ticker=result.ticker,
         synthesis=result.synthesis,
@@ -177,13 +223,14 @@ def get_thesis(ticker: str, llm: str | None = None) -> ThesisResponse:
     )
 
 
-@app.post("/ask/stream")
+@app.post("/ask/stream", dependencies=[Depends(rate_limit)])
 def ask_stream_endpoint(request: AskRequest) -> StreamingResponse:
     """SSE stream: {"token": str} events as the answer generates, then one
     {"done": true, answer, sources, prompt_version} event with the validated
     final answer (citation gate applied) that the client must render instead.
     A failure after headers are sent becomes one {"error": str} event, since
     the 200 status can no longer change."""
+    _check_llm(request.llm)
 
     def gen():
         try:
@@ -198,9 +245,9 @@ def ask_stream_endpoint(request: AskRequest) -> StreamingResponse:
                     yield f"data: {json.dumps(payload)}\n\n"
                 else:
                     yield f"data: {json.dumps({'token': item})}\n\n"
-        except Exception as exc:
+        except Exception:
             logger.exception("ask/stream failed for %s", request.ticker)
-            yield f"data: {json.dumps({'error': f'{type(exc).__name__}: {exc}'})}\n\n"
+            yield f"data: {json.dumps({'error': 'Answer generation failed.'})}\n\n"
 
     return StreamingResponse(
         gen(),
@@ -209,8 +256,9 @@ def ask_stream_endpoint(request: AskRequest) -> StreamingResponse:
     )
 
 
-@app.post("/ask")
+@app.post("/ask", dependencies=[Depends(rate_limit)])
 def ask_endpoint(request: AskRequest) -> AskResponse:
+    _check_llm(request.llm)
     result = rag_ask(request.question, request.ticker, llm_provider=request.llm)
     return AskResponse(
         answer=result.answer,
