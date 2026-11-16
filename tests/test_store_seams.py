@@ -41,6 +41,21 @@ def test_nvidia_embeddings_batches_and_input_types():
     assert calls[-1]["input_type"] == "query"
 
 
+def test_nvidia_embeddings_requests_and_checks_dimensions():
+    calls: list[dict] = []
+    emb = NvidiaEmbeddings(
+        model="m", url="https://nim.test/v1/embeddings", api_key="k", dimensions=2, client=_fake_nim(calls)
+    )
+    assert emb.embed_query("abc") == [3.0, 0.0]
+    assert calls[0]["dimensions"] == 2
+
+    wrong = NvidiaEmbeddings(
+        model="m", url="https://nim.test/v1/embeddings", api_key="k", dimensions=1024, client=_fake_nim([])
+    )
+    with pytest.raises(RuntimeError, match="2-d vectors, expected 1024"):
+        wrong.embed_query("abc")
+
+
 def test_nvidia_embeddings_rejects_short_response():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"data": [{"index": 0, "embedding": [0.0]}]})
