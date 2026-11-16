@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     gemini_api_key: str = ""
-    sec_user_agent: str = "StockRAG/0.1 rajyyug@gmail.com"
+    # EDGAR requires "Name contact@email" in the User-Agent. Set
+    # SEC_USER_AGENT in the env; no real address is committed to the repo.
+    sec_user_agent: str = ""
 
     # Langfuse tracing (optional; tracing is a no-op when keys are absent).
     langfuse_public_key: str = ""
