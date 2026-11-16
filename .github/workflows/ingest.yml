@@ -1,0 +1,55 @@
+# Ingest SEC filings into Supabase. Separate from the PR checks in eval.yml:
+# this one hits EDGAR, NIM and Supabase with repo secrets, so it never runs on
+# pull requests. The weekly run also keeps the free Supabase project from
+# pausing after ~7 idle days. workflow_dispatch only shows up in the Actions
+# tab once this file is on the default branch.
+name: ingest
+
+on:
+  workflow_dispatch:
+    inputs:
+      ticker:
+        description: "Ticker to ingest, e.g. AAPL"
+        required: true
+  schedule:
+    - cron: "17 6 * * 1"  # Mondays 06:17 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ingest
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: uv sync --no-dev
+      - name: Ingest
+        # Secrets live on this step only, not on checkout/setup/sync.
+        env:
+          VECTOR_STORE: supabase
+          EMBEDDING_PROVIDER: nvidia
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          # Passed through env, never interpolated into the script (injection).
+          TICKERS: ${{ inputs.ticker || 'AAPL MSFT NVDA' }}
+        run: |
+          set -f
+          status=0
+          for t in $TICKERS; do
+            if [[ ! "$t" =~ ^[A-Za-z0-9][A-Za-z0-9.\&-]{0,19}$ ]]; then
+              echo "::error::invalid ticker: $t"; status=1; continue
+            fi
+            echo "::group::$t"
+            uv run stockrag ingest "$t" || status=1
+            echo "::endgroup::"
+          done
+          exit $status

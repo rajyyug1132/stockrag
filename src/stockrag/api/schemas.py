@@ -1,4 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+# SEC tickers (BRK.B, BF-B) and NSE symbols (BAJAJ-AUTO, M&M).
+TICKER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9.&-]{0,19}$"
 
 
 class IngestResponse(BaseModel):
@@ -9,8 +12,8 @@ class IngestResponse(BaseModel):
 
 
 class AskRequest(BaseModel):
-    question: str
-    ticker: str
+    question: str = Field(min_length=1, max_length=1000)
+    ticker: str = Field(pattern=TICKER_PATTERN)
     llm: str | None = None  # "nvidia" (default), "gemini", or "ollama"; None = configured default
 
 

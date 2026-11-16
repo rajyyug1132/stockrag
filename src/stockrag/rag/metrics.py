@@ -1,5 +1,6 @@
 import json
 import re
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,6 +12,7 @@ MODEL_PRICES: dict[str, tuple[float, float]] = {
     "gemini-2.5-flash-lite": (0.10, 0.40),
 }
 
+_FILE_LOCK = threading.Lock()
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 _CITATION_RE = re.compile(r"\[\d+\]")
 
@@ -40,13 +42,42 @@ def record_request(record: dict) -> None:
     metrics must not break the request path.
     """
     try:
+        record = {"timestamp": datetime.now(timezone.utc).isoformat(), **record}
+        if settings.vector_store == "supabase":
+            from stockrag.rag.supabase_store import get_client
+
+            get_client().request(
+                "POST", "request_metrics", headers={"Prefer": "return=minimal"}, json={"record": record}
+            )
+            return
         path = metrics_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        record = {"timestamp": datetime.now(timezone.utc).isoformat(), **record}
-        with path.open("a", encoding="utf-8") as f:
+        with _FILE_LOCK, path.open("a", encoding="utf-8") as f:  # thesis asks run in threads
             f.write(json.dumps(record) + "\n")
     except Exception:
         pass
+
+
+# ponytail: newest 5000 rows only, so /metrics and summarize() ignore older
+# requests; aggregate in SQL (a view/RPC) if that ceiling starts to matter.
+SUPABASE_METRICS_LIMIT = 5000
+
+
+def metrics_rows() -> list[dict]:
+    """Recorded requests, newest first, from the JSONL file or Supabase."""
+    if settings.vector_store == "supabase":
+        from stockrag.rag.supabase_store import get_client
+
+        rows = get_client().request(
+            "GET", "request_metrics", retry=True,
+            params={"select": "record", "order": "created_at.desc", "limit": SUPABASE_METRICS_LIMIT},
+        )
+        return [r["record"] for r in rows or []]
+    path = metrics_path()
+    if not path.exists():
+        return []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in reversed(lines) if line.strip()]
 
 
 def _percentile(values: list[float], pct: float) -> float | None:
@@ -58,11 +89,10 @@ def _percentile(values: list[float], pct: float) -> float | None:
 
 
 def summarize() -> dict:
-    path = metrics_path()
-    if not path.exists():
+    rows = metrics_rows()
+    if not rows:
         return {"requests": 0}
 
-    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     latencies = [r["total_ms"] for r in rows if "total_ms" in r]
     coverages = [r["citation_coverage"] for r in rows if "citation_coverage" in r]
     costs = [r["cost_usd"] for r in rows if "cost_usd" in r]

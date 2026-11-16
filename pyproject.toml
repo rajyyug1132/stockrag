@@ -16,28 +16,22 @@ dependencies = [
     "pydantic-settings~=2.7",
     "typer~=0.15",
     "beautifulsoup4~=4.12",
-    "lxml~=5.3",
+    "lxml~=6.1",
     "tiktoken~=0.8",
-    "sentence-transformers~=3.3",
-    "chromadb~=0.6",
-    "rank-bm25~=0.2",
     "yfinance~=0.2",
     "pandas~=2.2",
     "numpy~=2.1",
     "pyyaml~=6.0",
     "langchain~=0.3",
     "langchain-community~=0.3",
-    "langchain-chroma~=0.2",
-    "langchain-huggingface~=0.1",
     "langchain-ollama~=0.2",
     "langchain-google-genai~=2.0",
     # NIM is the default provider and rag/llm.py reaches for ChatOpenAI; without
     # this it only resolved as a ragas (dev-group) transitive, so --no-dev
     # installs (Docker, HF Space) broke on the default path.
     "langchain-openai~=0.3",
-    "torch~=2.5",
     "langfuse>=4.13.0",
-    "pypdf~=5.1",
+    "pypdf~=6.21",
     "python-multipart>=0.0.32",
 ]
 
@@ -49,6 +43,17 @@ dev = [
     "pytest~=8.3",
     "ruff~=0.8",
     "ragas~=0.2",
+    "pgserver>=0.1.4",
+]
+# Chroma + local models. Plain `uv sync` installs this (default-groups below);
+# the serverless API (VECTOR_STORE=supabase, *_PROVIDER=nvidia) skips it.
+local = [
+    "torch~=2.5",
+    "sentence-transformers~=3.3",
+    "chromadb~=0.6",
+    "rank-bm25~=0.2",
+    "langchain-chroma~=0.2",
+    "langchain-huggingface~=0.1",
 ]
 
 [[tool.uv.index]]
@@ -64,6 +69,7 @@ torch = { index = "pytorch-cpu" }
 # Tools. 0.7.5 has a real Windows cp312 wheel and satisfies chromadb's
 # constraint, so pin it explicitly to stay on prebuilt wheels.
 [tool.uv]
+default-groups = ["dev", "local"]
 override-dependencies = ["chroma-hnswlib==0.7.5"]
 
 [build-system]
