@@ -5,7 +5,7 @@ from stockrag.edgar.filings import FilingRef, download_filing, list_filings
 from stockrag.edgar.tickers import cik_for_ticker
 from stockrag.ingestion.chunk import chunk_text
 from stockrag.ingestion.parse import parse_filing_sections
-from stockrag.rag.store import accession_already_ingested, get_vector_store
+from stockrag.rag.store import ChunkStore, get_store
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,14 @@ def _chunk_filing(ref: FilingRef, html: str) -> tuple[list[str], list[dict]]:
     return texts, metadatas
 
 
+def _add_chunks(store: ChunkStore, accession: str, texts: list[str], metadatas: list[dict]) -> None:
+    """Store a filing's chunks with ids "{accession}:{i}"; i is also kept as
+    chunk_index so a backend can find a chunk's section neighbours by index."""
+    for i, meta in enumerate(metadatas):
+        meta["chunk_index"] = i
+    store.add_chunks(texts, metadatas, [f"{accession}:{i}" for i in range(len(texts))])
+
+
 def ingest_html(
     html: str,
     ticker: str,
@@ -45,8 +53,8 @@ def ingest_html(
     """Ingest a filing from local HTML without touching EDGAR — used by the
     CI eval workflow (fixtures only, no network) and for ad-hoc documents.
     """
-    store = get_vector_store()
-    if accession_already_ingested(store, accession):
+    store = get_store()
+    if store.accession_ingested(accession):
         return IngestResult(filings_ingested=0, filings_skipped=1, chunks_added=0)
 
     ref = FilingRef(
@@ -59,8 +67,7 @@ def ingest_html(
     )
     texts, metadatas = _chunk_filing(ref, html)
     if texts:
-        ids = [f"{accession}:{i}" for i in range(len(texts))]
-        store.add_texts(texts=texts, metadatas=metadatas, ids=ids)
+        _add_chunks(store, accession, texts, metadatas)
     return IngestResult(filings_ingested=1, filings_skipped=0, chunks_added=len(texts))
 
 
@@ -77,8 +84,8 @@ def ingest_pdf(
     from stockrag.ingestion.parse_pdf import parse_pdf_sections
 
     accession = accession or f"pdf:{ticker.upper()}:{filing_date or path}"
-    store = get_vector_store()
-    if accession_already_ingested(store, accession):
+    store = get_store()
+    if store.accession_ingested(accession):
         return IngestResult(filings_ingested=0, filings_skipped=1, chunks_added=0)
 
     ref = FilingRef(
@@ -106,13 +113,12 @@ def ingest_pdf(
                 }
             )
     if texts:
-        ids = [f"{accession}:{i}" for i in range(len(texts))]
-        store.add_texts(texts=texts, metadatas=metadatas, ids=ids)
+        _add_chunks(store, accession, texts, metadatas)
     return IngestResult(filings_ingested=1, filings_skipped=0, chunks_added=len(texts))
 
 
 def ingest_ticker(ticker: str, forms: tuple[str, ...] = ("10-K",), years: int = 2) -> IngestResult:
-    store = get_vector_store()
+    store = get_store()
 
     with EdgarClient() as client:
         cik = cik_for_ticker(ticker, client=client)
@@ -123,15 +129,14 @@ def ingest_ticker(ticker: str, forms: tuple[str, ...] = ("10-K",), years: int = 
         chunks_added = 0
 
         for ref in filings:
-            if accession_already_ingested(store, ref.accession_number):
+            if store.accession_ingested(ref.accession_number):
                 filings_skipped += 1
                 continue
 
             html = download_filing(ref, client)
             texts, metadatas = _chunk_filing(ref, html)
             if texts:
-                ids = [f"{ref.accession_number}:{i}" for i in range(len(texts))]
-                store.add_texts(texts=texts, metadatas=metadatas, ids=ids)
+                _add_chunks(store, ref.accession_number, texts, metadatas)
                 chunks_added += len(texts)
             filings_ingested += 1
 

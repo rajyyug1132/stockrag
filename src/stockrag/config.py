@@ -22,7 +22,21 @@ class Settings(BaseSettings):
     chroma_dir: Path = PROJECT_ROOT / "data" / "chroma"
     prompts_dir: Path = PROJECT_ROOT / "prompts"
 
+    # Retrieval backend: "chroma" (local disk + in-process BM25, the default
+    # for dev, Ollama and CI) or "supabase" (pgvector + Postgres full-text,
+    # for the serverless API). The service key is server-side only.
+    vector_store: str = "chroma"
+    supabase_url: str = ""
+    supabase_service_key: str = ""
+
+    # Embeddings: "local" (bge below, on CPU) or "nvidia" (hosted NIM). Vectors
+    # from the two are not interchangeable: an index built with one must be
+    # queried with the same one.
+    embedding_provider: str = "local"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
+    # Provisional until scripts/probe_nim_embed.py confirms it for this account.
+    nvidia_embed_model: str = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+    nvidia_embed_url: str = "https://integrate.api.nvidia.com/v1/embeddings"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     # "local" (cross-encoder above) or "nvidia" (hosted NIM reranker, uses
     # NVIDIA_API_KEY; falls back to local on any error). Default stays local
@@ -35,6 +49,10 @@ class Settings(BaseSettings):
 
     llm_provider: str = "nvidia"  # "nvidia" (NIM API), "gemini" (API), or "ollama" (local)
     ollama_model: str = "qwen3:4b"  # fits ~5GB free RAM; qwen3:14b needs 8.4GB
+    # Token budget for retrieved context sent to Ollama. Must leave room inside
+    # num_ctx (8192, rag/llm.py) for the rules, the question and the answer;
+    # counted with cl100k, which undercounts qwen's tokenizer a little.
+    ollama_context_tokens: int = 5500
     gemini_model: str = "gemini-3.5-flash"  # 2.5-flash is 404 for new API keys
 
     # NVIDIA NIM (OpenAI-compatible); free endpoint, no daily-20 cap like Gemini free tier.
