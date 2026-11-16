@@ -49,5 +49,5 @@ def test_ask_stream_error_event(monkeypatch):
     events = [json.loads(e[len("data: "):]) for e in resp.text.strip().split("\n\n")]
     assert events == [
         {"token": "Revenue "},
-        {"error": "RuntimeError: 401 Unauthorized from NIM"},
+        {"error": "Answer generation failed."},  # no upstream internals
     ]
