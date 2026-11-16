@@ -8,7 +8,7 @@ import time
 from collections import deque
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Path, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Path, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
@@ -198,7 +198,13 @@ def get_factors(ticker: str = Ticker) -> FactorReport:
 
 
 @app.post("/ingest/{ticker}", dependencies=[Depends(require_ingest_token)])
-def ingest(ticker: str = Ticker, forms: str = "10-K", years: int = 2) -> IngestResponse:
+def ingest(
+    ticker: str = Ticker,
+    # Comma-separated SEC form types (e.g. "10-K,10-Q"); years bounded so a
+    # huge value can't overflow the date math into a 500.
+    forms: str = Query("10-K", pattern=r"^[0-9A-Z/-]{1,10}(,[0-9A-Z/-]{1,10}){0,4}$"),
+    years: int = Query(2, ge=1, le=10),
+) -> IngestResponse:
     form_tuple = tuple(f.strip() for f in forms.split(","))
     try:
         result = ingest_ticker(ticker, forms=form_tuple, years=years)

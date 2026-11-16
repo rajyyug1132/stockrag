@@ -149,3 +149,12 @@ def test_pdf_upload_cap(client, monkeypatch):
     assert client.post("/ingest-pdf", data={"ticker": "TCS"}, files=big).status_code == 413
     ok = {"file": ("r.pdf", b"%PDF-1.4", "application/pdf")}
     assert client.post("/ingest-pdf", data={"ticker": "TCS"}, files=ok).status_code == 200
+
+
+def test_ingest_query_params_validated(client, monkeypatch):
+    monkeypatch.setattr(S, "ingest_token", "s3cret")
+    h = {"x-ingest-token": "s3cret"}
+    assert client.post("/ingest/AAPL?years=999999", headers=h).status_code == 422
+    assert client.post("/ingest/AAPL?years=0", headers=h).status_code == 422
+    assert client.post("/ingest/AAPL?forms=10-K;rm", headers=h).status_code == 422
+    assert client.post("/ingest/AAPL?forms=10-K,10-Q&years=3", headers=h).status_code == 200
