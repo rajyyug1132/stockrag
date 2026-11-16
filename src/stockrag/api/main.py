@@ -22,7 +22,7 @@ from stockrag.api.schemas import (
 from stockrag.factor_engine.report import FactorReport, build_factor_report
 from stockrag.ingestion.pipeline import ingest_pdf, ingest_ticker
 from stockrag.rag.answer import AnswerResult, ask as rag_ask, ask_stream as rag_ask_stream
-from stockrag.rag.metrics import metrics_path
+from stockrag.rag.metrics import metrics_rows
 from stockrag.rag.thesis import build_thesis
 
 # uvicorn only attaches handlers to its own loggers, so a module logger's INFO
@@ -96,11 +96,7 @@ def health() -> dict[str, str]:
 @app.get("/metrics")
 def get_metrics() -> list[dict]:
     """Recorded ask() requests, newest first (backs the frontend Metrics view)."""
-    path = metrics_path()
-    if not path.exists():
-        return []
-    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    return rows[::-1]
+    return metrics_rows()
 
 
 @app.get("/factors/{ticker}")

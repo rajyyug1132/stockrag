@@ -8,7 +8,9 @@ report, qualitative side from citation-enforced RAG answers over filings.
 import hashlib
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 
 import yaml
 
@@ -58,13 +60,29 @@ def _cache_path(ticker: str):
     return settings.data_dir / "thesis" / f"{ticker}.json"
 
 
-def _load_cached(ticker: str, fingerprint: str) -> ThesisResult | None:
+def _read_cache(ticker: str) -> dict | None:
+    if settings.vector_store == "supabase":
+        from stockrag.rag.supabase_store import get_client
+
+        try:
+            rows = get_client().request(
+                "GET", "thesis_cache", retry=True, params={"ticker": f"eq.{ticker}", "select": "payload"}
+            )
+            return rows[0]["payload"] if rows else None
+        except Exception:  # a cache miss is cheaper than a failed request
+            return None
     path = _cache_path(ticker)
     if not path.exists():
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _load_cached(ticker: str, fingerprint: str) -> ThesisResult | None:
+    data = _read_cache(ticker)
+    if data is None:
         return None
     if data.get("fingerprint") != fingerprint or data.get("prompt_version") != PROMPT_VERSION:
         return None
@@ -91,8 +109,6 @@ def _load_cached(ticker: str, fingerprint: str) -> ThesisResult | None:
 
 
 def _save_cache(result: ThesisResult, fingerprint: str) -> None:
-    path = _cache_path(result.ticker)
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "fingerprint": fingerprint,
         "ticker": result.ticker,
@@ -109,6 +125,22 @@ def _save_cache(result: ThesisResult, fingerprint: str) -> None:
         "synthesis": result.synthesis,
         "prompt_version": result.prompt_version,
     }
+    if settings.vector_store == "supabase":
+        from stockrag.rag.supabase_store import get_client
+
+        try:
+            get_client().request(
+                "POST", "thesis_cache", retry=True,  # idempotent upsert
+                params={"on_conflict": "ticker"},
+                headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+                json={"ticker": result.ticker, "fingerprint": fingerprint, "payload": payload,
+                      "updated_at": datetime.now(timezone.utc).isoformat()},
+            )
+        except Exception:  # the thesis is computed; failing to cache it must not fail the request
+            pass
+        return
+    path = _cache_path(result.ticker)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
@@ -124,17 +156,19 @@ def build_thesis(ticker: str, llm_provider: str | None = None) -> ThesisResult:
 
     factors = build_factor_report(ticker)
 
-    sections = []
-    for topic, question in THESIS_QUESTIONS:
+    def _section(tq: tuple[str, str]) -> ThesisSection:
+        topic, question = tq
         result = ask(question, ticker, llm_provider=llm_provider)
-        sections.append(
-            ThesisSection(
-                topic=topic,
-                question=question,
-                result=result,
-                grounding=citation_coverage(result.answer),
-            )
+        return ThesisSection(
+            topic=topic, question=question, result=result, grounding=citation_coverage(result.answer)
         )
+
+    # First question alone: ask() builds lru_cache singletons (Chroma client, BM25,
+    # cross-encoder) that aren't safe to race on a cold process. The rest run in parallel.
+    first, *rest = THESIS_QUESTIONS
+    sections = [_section(first)]
+    with ThreadPoolExecutor(max_workers=max(len(rest), 1)) as pool:
+        sections += pool.map(_section, rest)  # map keeps question order
 
     data = yaml.safe_load(
         (settings.prompts_dir / f"{PROMPT_VERSION}.yaml").read_text(encoding="utf-8")
