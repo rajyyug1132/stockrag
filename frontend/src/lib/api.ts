@@ -166,14 +166,34 @@ export async function ingest(ticker: string, token?: string): Promise<IngestResp
   return res.json()
 }
 
-export async function getMetrics(): Promise<MetricsEntry[]> {
+// The ingest token guards /ingest and /metrics. It must never ship in the
+// bundle (a VITE_ var is public), so the operator pastes it; sessionStorage
+// keeps it for this tab only.
+const TOKEN_KEY = 'stockrag.ingestToken'
+
+export function loadIngestToken(): string {
   try {
-    const res = await fetch(`${BASE_URL}/metrics`)
-    if (!res.ok) return []
-    return res.json()
+    return sessionStorage.getItem(TOKEN_KEY) ?? ''
   } catch {
-    return []
+    return ''
   }
+}
+
+export function saveIngestToken(token: string): void {
+  try {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token)
+    else sessionStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // storage blocked (private mode): the token just isn't remembered
+  }
+}
+
+export async function getMetrics(token?: string): Promise<MetricsEntry[]> {
+  const res = await fetch(`${BASE_URL}/metrics`, {
+    headers: token ? { 'X-Ingest-Token': token } : {},
+  })
+  if (!res.ok) throw await toError(res)
+  return res.json()
 }
 
 export async function getHealth(): Promise<boolean> {
