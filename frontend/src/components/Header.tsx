@@ -41,9 +41,12 @@ export default function Header({ activeView, onViewChange }: HeaderProps) {
   return (
     <header className="border-b border-line bg-bg">
       <div className="max-w-6xl mx-auto px-4 pt-6 pb-0 md:px-6">
-        <div className="flex items-baseline justify-between gap-4 mb-5">
-          <span className="font-mono text-xl font-semibold text-ink">
-            StockRAG<span className="text-accent">.ai</span>
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <span className="flex items-center gap-2.5 font-mono text-xl font-semibold text-ink">
+            <img src="/favicon.svg" alt="" width={24} height={24} className="shrink-0" />
+            <span>
+              StockRAG<span className="text-accent">.ai</span>
+            </span>
           </span>
           <div className="flex items-baseline gap-5">
             <p className="hidden sm:block text-xs uppercase tracking-kicker text-ink-faint font-mono">
