@@ -16,11 +16,23 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://cloud.langfuse.com"
 
+    # Everything written at runtime lives under data_dir; on a read-only
+    # serverless filesystem set DATA_DIR to a writable temp dir (/tmp/stockrag).
     data_dir: Path = PROJECT_ROOT / "data"
-    filings_dir: Path = PROJECT_ROOT / "data" / "filings"
-    facts_dir: Path = PROJECT_ROOT / "data" / "facts"
-    chroma_dir: Path = PROJECT_ROOT / "data" / "chroma"
-    prompts_dir: Path = PROJECT_ROOT / "prompts"
+    # Inside the package so a non-editable install (the Vercel API) ships them.
+    prompts_dir: Path = Path(__file__).parent / "prompts"
+
+    @property
+    def filings_dir(self) -> Path:
+        return self.data_dir / "filings"
+
+    @property
+    def facts_dir(self) -> Path:
+        return self.data_dir / "facts"
+
+    @property
+    def chroma_dir(self) -> Path:
+        return self.data_dir / "chroma"
 
     # Retrieval backend: "chroma" (local disk + in-process BM25, the default
     # for dev, Ollama and CI) or "supabase" (pgvector + Postgres full-text,
