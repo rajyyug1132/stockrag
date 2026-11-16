@@ -147,7 +147,7 @@ no torch/chromadb wheels yet).
 
 ```powershell
 uv sync
-copy .env.example .env   # fill NVIDIA_API_KEY (or GEMINI_API_KEY)
+copy .env.example .env   # fill NVIDIA_API_KEY (or GEMINI_API_KEY) and SEC_USER_AGENT
 ```
 
 To try the pipeline without touching EDGAR, ingest the sample 10-K excerpt that
@@ -242,22 +242,22 @@ Three pieces, three free hosts:
 The Space starts with an empty vector store because free-tier storage is
 ephemeral. Ingest a ticker once after boot (`POST /ingest/AAPL`, or the Ingest
 button in the React UI), or set `AUTO_INGEST_TICKERS` to ingest at startup. It
-stays indexed until the Space sleeps. Asking about a ticker before it is
-ingested caches an empty keyword index for it, and newly ingested filings do
-not refresh that index, so hybrid retrieval falls back to vector-only until the
-server restarts.
+stays indexed until the Space sleeps.
 
 `INGEST_TOKEN` (sent as an `X-Ingest-Token` header) guards `POST /ingest/{ticker}`,
 `POST /ingest-pdf` and `GET /metrics`, so strangers can't spend your EDGAR
-quota. It is optional with the Chroma store, but with `VECTOR_STORE=supabase`
-ingest returns 503 until it is set. Known gaps once a token is set: the
-Streamlit client's Ingest button sends no token and gets a 403, and the React
-Metrics view shows no data.
+quota. With no token those routes stay closed (503); set `ALLOW_OPEN_INGEST=true`
+to open them for local development. Use 32+ random characters, since failed
+attempts are not rate-limited. Both web clients take the token in the UI
+(React on its Ingest and Metrics pages, Streamlit in the sidebar). The CLI is
+not affected.
 
 Other server settings: `RATE_LIMIT_PER_MINUTE` (default 20 per IP on `/ask`,
 `/ask/stream`, `/thesis` and `/factors`; in memory, per instance; 429 with
 `Retry-After`) and `CLIENT_IP_HEADER` (behind a proxy such as a Space, all
-clients share one rate-limit bucket until it is set).
+clients share one rate-limit bucket until it is set; only name a header the
+host overwrites). `THESIS_MAX_CONCURRENT` (default 2) caps how many thesis runs
+execute at once.
 
 ![Factor report for AAPL: Piotroski F-Score ring at 9/9, the nine accounting signals, and the metric table](docs/factors.png)
 
@@ -283,8 +283,8 @@ also contains a hosted configuration:
   serverless entrypoint for the API (`DATA_DIR=/tmp/stockrag`).
 - **Scheduled ingest:** `.github/workflows/ingest.yml` ingests AAPL, MSFT and
   NVDA into Supabase every Monday at 06:17 UTC and can be run by hand with a
-  ticker input. It needs the `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` and
-  `NVIDIA_API_KEY` repo secrets, and the weekly run keeps the free Supabase
+  ticker input. It needs the `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
+  `NVIDIA_API_KEY` and `SEC_USER_AGENT` repo secrets, and the weekly run keeps the free Supabase
   project from pausing.
 
 ## Observability

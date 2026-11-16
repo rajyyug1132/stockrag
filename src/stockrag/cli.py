@@ -31,7 +31,7 @@ def ingest(ticker: str, forms: str = "10-K", years: int = 2) -> None:
 
 
 @app.command()
-def ask(question: str, ticker: str, llm: str = typer.Option(None, help="LLM provider: ollama (default) or gemini")) -> None:
+def ask(question: str, ticker: str, llm: str = typer.Option(None, help="LLM provider: nvidia (default), gemini or ollama")) -> None:
     """Ask a question about a ticker's ingested filings."""
     from stockrag.rag.answer import ask as _ask
 

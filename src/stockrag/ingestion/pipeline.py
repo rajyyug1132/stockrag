@@ -1,3 +1,4 @@
+import sys
 from dataclasses import dataclass
 
 from stockrag.edgar.client import EdgarClient
@@ -41,6 +42,12 @@ def _add_chunks(store: ChunkStore, accession: str, texts: list[str], metadatas: 
     for i, meta in enumerate(metadatas):
         meta["chunk_index"] = i
     store.add_chunks(texts, metadatas, [f"{accession}:{i}" for i in range(len(texts))])
+    # BM25 indexes are cached per ticker (including "nothing ingested yet"), so
+    # drop them once new chunks land. Looked up via sys.modules so the slim
+    # serverless deploy never imports the retriever stack just to clear it.
+    retrieve = sys.modules.get("stockrag.rag.retrieve")
+    if retrieve is not None:
+        retrieve._bm25_retriever.cache_clear()
 
 
 def ingest_html(

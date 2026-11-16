@@ -141,3 +141,14 @@ def test_transient_errors_are_retried_and_client_errors_are_not():
     assert _transient(status_error(429)) and _transient(status_error(503))
     assert not _transient(status_error(400)) and not _transient(status_error(401))
     assert not _transient(RuntimeError("NVIDIA_API_KEY is not set"))
+
+
+def test_ingest_clears_cached_bm25_index(monkeypatch):
+    """A ticker asked about before ingest caches 'no BM25 corpus'; ingest must drop it."""
+    import stockrag.rag.retrieve as retrieve
+    from stockrag.ingestion import pipeline
+
+    calls = []
+    monkeypatch.setattr(retrieve._bm25_retriever, "cache_clear", lambda: calls.append(1))
+    pipeline._add_chunks(FakeStore(), "acc-1", ["text"], [{"ticker": "AAPL"}])
+    assert calls == [1]
