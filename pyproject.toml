@@ -16,7 +16,7 @@ dependencies = [
     "pydantic-settings~=2.7",
     "typer~=0.15",
     "beautifulsoup4~=4.12",
-    "lxml~=5.3",
+    "lxml~=6.1",
     "tiktoken~=0.8",
     "yfinance~=0.2",
     "pandas~=2.2",
@@ -31,7 +31,7 @@ dependencies = [
     # installs (Docker, HF Space) broke on the default path.
     "langchain-openai~=0.3",
     "langfuse>=4.13.0",
-    "pypdf~=5.1",
+    "pypdf~=6.21",
     "python-multipart>=0.0.32",
 ]
 

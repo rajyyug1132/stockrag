@@ -1,7 +1,7 @@
 ..
 aiohappyeyeballs==2.7.1
     # via aiohttp
-aiohttp==3.14.1
+aiohttp==3.14.5
     # via langchain-community
 aiosignal==1.4.0
     # via aiohttp
@@ -11,7 +11,7 @@ annotated-doc==0.0.4
     #   typer
 annotated-types==0.7.0
     # via pydantic
-anyio==4.14.1
+anyio==4.16.0
     # via
     #   httpx
     #   langsmith
@@ -26,7 +26,7 @@ beautifulsoup4==4.15.0
     # via
     #   stockrag
     #   yfinance
-certifi==2026.6.17
+certifi==2026.10.23
     # via
     #   curl-cffi
     #   httpcore
@@ -46,7 +46,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   tqdm
     #   typer
     #   uvicorn
-cryptography==49.0.0
+cryptography==50.0.2
     # via google-auth
 curl-cffi==0.15.0
     # via yfinance
@@ -146,7 +146,7 @@ langsmith==0.9.6
     #   langchain
     #   langchain-community
     #   langchain-core
-lxml==5.4.0
+lxml==6.1.3
     # via stockrag
 markdown-it-py==4.2.0
     # via rich
@@ -154,7 +154,7 @@ marshmallow==3.26.2
     # via dataclasses-json
 mdurl==0.1.2
     # via markdown-it-py
-multidict==6.7.1
+multidict==7.2.1
     # via
     #   aiohttp
     #   yarl
@@ -172,25 +172,31 @@ ollama==0.6.2
     # via langchain-ollama
 openai==2.44.0
     # via langchain-openai
-opentelemetry-api==1.43.0
+opentelemetry-api==1.45.2
     # via
     #   langfuse
+    #   opentelemetry-exporter-http-transport
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
-opentelemetry-exporter-otlp-proto-common==1.43.0
+opentelemetry-exporter-http-transport==0.66b2
     # via opentelemetry-exporter-otlp-proto-http
-opentelemetry-exporter-otlp-proto-http==1.43.0
+opentelemetry-exporter-otlp-common==0.66b2
+    # via opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-proto-common==1.45.2
+    # via opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-proto-http==1.45.2
     # via langfuse
-opentelemetry-proto==1.43.0
+opentelemetry-proto==1.45.2
     # via
     #   opentelemetry-exporter-otlp-proto-common
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-sdk==1.43.0
+opentelemetry-sdk==1.45.2
     # via
     #   langfuse
+    #   opentelemetry-exporter-otlp-common
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-semantic-conventions==0.64b0
+opentelemetry-semantic-conventions==0.66b2
     # via opentelemetry-sdk
 orjson==3.11.9 ; platform_python_implementation != 'PyPy'
     # via langsmith
@@ -225,7 +231,7 @@ protobuf==7.35.1
     #   opentelemetry-proto
     #   proto-plus
     #   yfinance
-pyasn1==0.6.3
+pyasn1==0.6.5
     # via pyasn1-modules
 pyasn1-modules==0.4.2
     # via google-auth
@@ -251,7 +257,7 @@ pydantic-settings==2.14.2
     #   stockrag
 pygments==2.20.0
     # via rich
-pypdf==5.9.0
+pypdf==6.21.4
     # via stockrag
 python-dateutil==2.9.0.post0
     # via pandas
@@ -280,6 +286,7 @@ requests==2.34.2
     #   langchain
     #   langchain-community
     #   langsmith
+    #   opentelemetry-exporter-http-transport
     #   opentelemetry-exporter-otlp-proto-http
     #   requests-toolbelt
     #   tiktoken
@@ -298,7 +305,7 @@ sniffio==1.3.1
     # via
     #   langsmith
     #   openai
-soupsieve==2.8.4
+soupsieve==4.1.1
     # via beautifulsoup4
 sqlalchemy==2.0.51
     # via
@@ -349,7 +356,7 @@ typing-inspection==0.4.2
     #   pydantic-settings
 tzdata==2026.2
     # via pandas
-urllib3==2.7.0
+urllib3==2.8.0
     # via requests
 uuid-utils==0.16.2
     # via
@@ -370,7 +377,7 @@ wrapt==2.2.2
     # via langfuse
 xxhash==3.8.0
     # via langsmith
-yarl==1.24.2
+yarl==1.25.1
     # via aiohttp
 yfinance==0.2.66
     # via stockrag
