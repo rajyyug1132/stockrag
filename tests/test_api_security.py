@@ -74,17 +74,76 @@ def test_ingest_token(client, monkeypatch):
     assert client.get("/metrics").status_code == 403
 
 
-def test_ingest_fails_closed_on_supabase_without_token(client, monkeypatch):
+@pytest.mark.parametrize("store", ["supabase", "chroma", "typo"])
+def test_ingest_fails_closed_without_token_whatever_the_backend(client, monkeypatch, store):
     monkeypatch.setattr(S, "ingest_token", "")
-    monkeypatch.setattr(S, "vector_store", "supabase")
+    monkeypatch.setattr(S, "vector_store", store)
     assert client.post("/ingest/AAPL").status_code == 503
     assert client.get("/metrics").status_code == 503
-    monkeypatch.setattr(S, "vector_store", "chroma")
-    assert client.post("/ingest/AAPL").status_code == 200  # local dev stays open
+    monkeypatch.setattr(S, "allow_open_ingest", True)  # explicit local-dev opt-in
+    assert client.post("/ingest/AAPL").status_code == 200
+
+
+def test_unauthenticated_or_oversized_bodies_refused_before_parsing(client, monkeypatch):
+    monkeypatch.setattr(S, "ingest_token", "s3cret")
+    monkeypatch.setattr(S, "max_upload_mb", 1)
+    called = []
+    monkeypatch.setattr(api_main, "ingest_pdf", lambda *a, **k: called.append(1))
+    small = {"file": ("r.pdf", b"%PDF-1.4", "application/pdf")}
+    assert client.post("/ingest-pdf", data={"ticker": "TCS"}, files=small).status_code == 403
+    big = {"file": ("r.pdf", b"x" * (3 * 1024 * 1024), "application/pdf")}
+    resp = client.post("/ingest-pdf", data={"ticker": "TCS"}, files=big, headers={"x-ingest-token": "s3cret"})
+    assert resp.status_code == 413 and resp.json() == {"detail": "Request body too large."}
+    assert called == []
+
+
+def test_small_routes_cap_and_lengthless_bodies(client, monkeypatch):
+    monkeypatch.setattr(S, "rate_limit_per_minute", 0)
+    big = client.post("/ask", content=b"{" + b" " * (70 * 1024) + b"}", headers={"content-type": "application/json"})
+    assert big.status_code == 413
+
+    def chunks():
+        yield b'{"question": "q", "ticker": "AAPL"}'
+
+    assert client.post("/ask", content=chunks(), headers={"content-type": "application/json"}).status_code == 411
+
+
+def test_guard_responses_keep_cors_headers(client, monkeypatch):
+    monkeypatch.setattr(S, "ingest_token", "s3cret")
+    origin = S.cors_origins.split(",")[0]
+    resp = client.post("/ingest/AAPL", headers={"origin": origin})
+    assert resp.status_code == 403 and resp.headers["access-control-allow-origin"] == origin
+
+
+def test_token_guessing_is_rate_limited(client, monkeypatch):
+    monkeypatch.setattr(S, "ingest_token", "s3cret")
+    monkeypatch.setattr(S, "rate_limit_per_minute", 2)
+    codes = [client.post("/ingest/AAPL", headers={"x-ingest-token": "guess"}).status_code for _ in range(3)]
+    assert codes == [403, 403, 429]
+
+
+def test_rate_limit_uses_rightmost_forwarded_entry(client, monkeypatch):
+    monkeypatch.setattr(S, "rate_limit_per_minute", 1)
+    monkeypatch.setattr(S, "client_ip_header", "x-forwarded-for")
+    # The client controls the leftmost entries; the proxy appends the real one.
+    assert ask(client, {"x-forwarded-for": "6.6.6.6, 9.9.9.9"}).status_code == 200
+    assert ask(client, {"x-forwarded-for": "7.7.7.7, 9.9.9.9"}).status_code == 429
+
+
+def test_thesis_concurrency_cap(client, monkeypatch):
+    monkeypatch.setattr(S, "rate_limit_per_minute", 0)
+    monkeypatch.setattr(api_main, "_thesis_slots", api_main.threading.BoundedSemaphore(1))
+    api_main._thesis_slots.acquire()  # one thesis already running
+    try:
+        resp = client.get("/thesis/AAPL")
+        assert resp.status_code == 429 and resp.headers["Retry-After"] == "30"
+    finally:
+        api_main._thesis_slots.release()
 
 
 def test_pdf_upload_cap(client, monkeypatch):
     monkeypatch.setattr(S, "ingest_token", "")
+    monkeypatch.setattr(S, "allow_open_ingest", True)
     monkeypatch.setattr(S, "max_upload_mb", 1)
     big = {"file": ("r.pdf", b"x" * (1024 * 1024 + 1), "application/pdf")}
     assert client.post("/ingest-pdf", data={"ticker": "TCS"}, files=big).status_code == 413
