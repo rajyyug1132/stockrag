@@ -18,6 +18,9 @@ class EdgarClient:
 
     def __init__(self, user_agent: str | None = None, requests_per_second: float | None = None):
         self.user_agent = user_agent or settings.sec_user_agent
+        if "@" not in self.user_agent:
+            # SEC throttles or blocks clients without a contact address.
+            raise ValueError('SEC_USER_AGENT must be set, e.g. "StockRAG/0.1 you@example.com"')
         rps = requests_per_second or settings.edgar_requests_per_second
         self._min_interval = 1.0 / rps
         self._last_request_at = 0.0

@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     gemini_api_key: str = ""
-    sec_user_agent: str = "StockRAG/0.1 rajyyug@gmail.com"
+    # EDGAR requires "Name contact@email" in the User-Agent. Set
+    # SEC_USER_AGENT in the env; no real address is committed to the repo.
+    sec_user_agent: str = ""
 
     # Langfuse tracing (optional; tracing is a no-op when keys are absent).
     langfuse_public_key: str = ""
@@ -99,10 +101,12 @@ class Settings(BaseSettings):
 
     edgar_requests_per_second: float = 8.0
 
-    # When set, POST /ingest requires a matching X-Ingest-Token header —
-    # a public /ingest lets strangers burn LLM quota and hit EDGAR from the
-    # server's IP. Empty (default) leaves it open for local dev.
+    # Ingest routes and /metrics require a matching X-Ingest-Token header — a
+    # public /ingest lets strangers burn LLM quota and hit EDGAR from the
+    # server's IP. Use 32+ random characters (failed attempts aren't limited).
+    # With no token they are closed, unless ALLOW_OPEN_INGEST=true (local dev).
     ingest_token: str = ""
+    allow_open_ingest: bool = False
 
     # Comma-separated tickers (e.g. "AAPL,MSFT") ingested in a background thread
     # at API startup — for hosts with an ephemeral disk. Empty (default) = off.
@@ -122,6 +126,9 @@ class Settings(BaseSettings):
     # Providers a request's `llm` field may pick. Production: "nvidia".
     llm_providers: str = "nvidia,gemini,ollama"
     max_upload_mb: int = 20
+    # Thesis runs several LLM calls for minutes on the shared threadpool; cap
+    # how many run at once so a few callers can't stall every other route.
+    thesis_max_concurrent: int = 2
 
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.filings_dir, self.facts_dir, self.chroma_dir):

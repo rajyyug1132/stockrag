@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Stock Research Factor Engine + Ask-My-Docs RAG"
 readme = "README.md"
 authors = [
-    { name = "rajyyug1132", email = "rajyyug@gmail.com" }
+    { name = "rajyyug1132" }
 ]
 requires-python = ">=3.12,<3.13"
 dependencies = [

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { askStream, ingest } from '../lib/api'
+import { askStream, ingest, loadIngestToken, saveIngestToken } from '../lib/api'
 import type { Source } from '../lib/api'
 import { Markdown } from '../components/Markdown'
 import { Pending } from '../components/motion'
@@ -18,7 +18,7 @@ export default function Ask() {
   const [error, setError] = useState('')
   const [ingesting, setIngesting] = useState(false)
   const [ingestStatus, setIngestStatus] = useState('')
-  const [ingestToken, setIngestToken] = useState('')
+  const [ingestToken, setIngestToken] = useState(loadIngestToken)
   // '' = whatever the server has configured (LLM_PROVIDER); the API takes a
   // per-request override, so the UI can switch providers without a restart.
   const [llm, setLlm] = useState('')
@@ -98,7 +98,10 @@ export default function Ask() {
           <input
             type="password"
             value={ingestToken}
-            onChange={(e) => setIngestToken(e.target.value)}
+            onChange={(e) => {
+              setIngestToken(e.target.value)
+              saveIngestToken(e.target.value)
+            }}
             placeholder="ingest token (if required)"
             className="text-xs w-52"
           />
